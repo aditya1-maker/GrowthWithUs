@@ -1,0 +1,30 @@
+{
+  "name": "Growy — Grow your productivity",
+  "short_name": "Growy",
+  "description": "Minimalist productivity and task tracking app.",
+  
+  "start_url": "./",
+  "scope": "./",
+
+  "display": "standalone",
+  "orientation": "potrait",
+
+  "background_color": "#F6F8FF",
+  "theme_color": "#7FAEFF",
+
+  "icons": [
+    {
+      "src": "app-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "app-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+} ]
+}
