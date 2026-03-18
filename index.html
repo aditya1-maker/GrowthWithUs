@@ -10,6 +10,44 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Growth+">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script>
+// Register Service Worker untuk offline support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    // Inline SW via blob URL karena single-file app
+    const swCode = `
+const CACHE = 'growthplus-v1';
+const ASSETS = ['/'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(()=>{}));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      const net = fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => cached);
+      return cached || net;
+    })
+  );
+});
+    `;
+    const blob = new Blob([swCode], {type: 'application/javascript'});
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl).catch(()=>{});
+  });
+}
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
@@ -162,8 +200,7 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
 .sr-title{font-size:0.9rem;font-weight:700;color:var(--navy)}
 .sr-ring{position:relative;width:80px;height:80px;flex-shrink:0}
 .sr-ring svg{transform:rotate(-90deg)}
-.sr-ring .sr-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:1.3rem;font-weight:800;color:var(--teal)}
-.sr-text small{font-size:0.5rem;font-weight:400;color:var(--gray-400)}
+.sr-ring .sr-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:1.1rem;font-weight:800;color:var(--teal)}
 .sr-status{font-size:0.85rem;color:var(--gray-600);flex:1;margin-left:16px}
 .sr-label{font-size:1rem;font-weight:700;color:var(--teal);margin-bottom:4px}
 .sr-bar-bg{height:8px;background:var(--gray-100);border-radius:99px;overflow:hidden;margin-top:12px}
@@ -333,8 +370,10 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
 .export-btn.excel-btn:hover{background:#1d6f42;color:#fff}
 
 /* TOAST */
-.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:12px 24px;border-radius:99px;font-size:0.85rem;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.25)}
-.toast.show{opacity:1}
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-8px);background:var(--grad-card);color:#fff;padding:12px 22px 12px 16px;border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.35s,transform 0.35s;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:10px;min-width:200px;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast-icon{width:26px;height:26px;background:rgba(255,255,255,0.25);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.85rem}
+.toast-msg{flex:1}
 
 /* SETTINGS */
 .settings-section{background:var(--white);border-radius:var(--radius-sm);margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow-sm)}
@@ -376,6 +415,66 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
 
 /* RESPONSIVE */
 @media(min-width:640px){.content{max-width:540px}.modal{border-radius:var(--radius)}.modal-overlay{align-items:center}}
+
+/* DESKTOP LAYOUT — aktif hanya saat toggle ON */
+body[data-desktop="true"] #app {
+  display:grid;
+  grid-template-columns:220px 1fr;
+  grid-template-rows:auto 1fr;
+  min-height:100vh;
+  padding-bottom:0;
+}
+body[data-desktop="true"] .topbar {
+  grid-column:1/-1;
+  grid-row:1;
+}
+body[data-desktop="true"] #deskSidebar {
+  display:flex !important;
+  grid-column:1;
+  grid-row:2;
+  flex-direction:column;
+  gap:4px;
+  background:var(--white);
+  border-right:1px solid var(--gray-200);
+  padding:20px 12px;
+  position:sticky;
+  top:57px;
+  height:calc(100vh - 57px);
+  overflow-y:auto;
+  box-shadow:2px 0 10px rgba(0,0,0,0.04);
+}
+body[data-desktop="true"] #deskPagesWrap {
+  grid-column:2;
+  grid-row:2;
+  overflow-y:auto;
+  height:calc(100vh - 57px);
+}
+body[data-desktop="true"] .content { max-width:680px; padding:24px 28px; }
+body[data-desktop="true"] #bottomNav { display:none !important; }
+
+/* Sidebar nav item */
+.desk-nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:var(--radius-sm);
+  cursor:pointer; border:none; background:none;
+  font-family:var(--font); font-size:0.86rem; font-weight:600;
+  color:var(--gray-600); width:100%; text-align:left;
+  transition:var(--transition);
+}
+.desk-nav-item:hover { background:var(--gray-100); color:var(--navy); }
+.desk-nav-item.active { background:var(--grad-soft); color:var(--teal); }
+.desk-nav-item .dni-icon {
+  width:32px; height:32px; border-radius:var(--radius-xs);
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; background:var(--gray-100); transition:var(--transition);
+}
+.desk-nav-item.active .dni-icon { background:var(--teal); color:#fff; }
+.desk-nav-divider { height:1px; background:var(--gray-100); margin:6px 0; }
+.desk-nav-brand { padding:4px 12px 16px; border-bottom:1px solid var(--gray-100); margin-bottom:6px; }
+.desk-nav-brand-logo { font-size:1.15rem; font-weight:800; color:var(--navy); }
+.desk-nav-brand-logo span { color:var(--teal); }
+.desk-nav-brand-user { font-size:0.72rem; color:var(--gray-400); margin-top:2px; }
+
 @media(max-width:360px){.balance-amount{font-size:1.9rem}.form-row{grid-template-columns:1fr}}
 
 /* ANIMATION UTILITIES */
@@ -427,6 +526,83 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
 
 /* DIVIDER */
 .divider{height:1px;background:var(--gray-200);margin:16px 0}
+
+/* SUNDAE PALETTE THEMES */
+[data-app-theme="passionfruit"]{
+  --navy:#4a2d6b;--teal:#8B6BAE;--teal-light:#b09ccc;
+  --sky:#c9b8e0;--sky-light:#e8e0f5;
+  --beige:#f5f0fc;--gray-100:#ede5f8;--gray-200:#d8ccee;
+  --grad-main:linear-gradient(135deg,#c5b4e0 0%,#ddd4f0 60%,#f5f0fc 100%);
+  --grad-card:linear-gradient(135deg,#8B6BAE 0%,#b09ccc 100%);
+  --grad-soft:linear-gradient(135deg,#ede5f8,#f5f0fc)
+}
+[data-app-theme="coolmint"]{
+  --navy:#1a4a44;--teal:#3a9e8f;--teal-light:#6abfb5;
+  --sky:#a8ddd8;--sky-light:#d4f0ed;
+  --beige:#f0fafa;--gray-100:#d8f2ef;--gray-200:#b0e0db;
+  --grad-main:linear-gradient(135deg,#8ecfca 0%,#b8e8e4 60%,#f0fafa 100%);
+  --grad-card:linear-gradient(135deg,#3a9e8f 0%,#6abfb5 100%);
+  --grad-soft:linear-gradient(135deg,#d8f2ef,#f0fafa)
+}
+[data-app-theme="juicypear"]{
+  --navy:#2a4a1e;--teal:#5a9e3a;--teal-light:#88c464;
+  --sky:#b8dda0;--sky-light:#dff0d0;
+  --beige:#f2faee;--gray-100:#dff0d0;--gray-200:#c0e0a8;
+  --grad-main:linear-gradient(135deg,#a8d888 0%,#c8eaac 60%,#f2faee 100%);
+  --grad-card:linear-gradient(135deg,#5a9e3a 0%,#88c464 100%);
+  --grad-soft:linear-gradient(135deg,#dff0d0,#f2faee)
+}
+[data-app-theme="honeyhoney"]{
+  --navy:#5c3a00;--teal:#c8882a;--teal-light:#e0aa60;
+  --sky:#f0cc90;--sky-light:#faebd0;
+  --beige:#fdf6ec;--gray-100:#faebd0;--gray-200:#f0d4a0;
+  --grad-main:linear-gradient(135deg,#eac87a 0%,#f5dca8 60%,#fdf6ec 100%);
+  --grad-card:linear-gradient(135deg,#c8882a 0%,#e0aa60 100%);
+  --grad-soft:linear-gradient(135deg,#faebd0,#fdf6ec)
+}
+[data-app-theme="lemonzest"]{
+  --navy:#4a4400;--teal:#b8a800;--teal-light:#d4c840;
+  --sky:#e8e088;--sky-light:#f5f0c0;
+  --beige:#fdfce8;--gray-100:#f5f0c0;--gray-200:#e8e098;
+  --grad-main:linear-gradient(135deg,#e0d870 0%,#eeea9c 60%,#fdfce8 100%);
+  --grad-card:linear-gradient(135deg,#b8a800 0%,#d4c840 100%);
+  --grad-soft:linear-gradient(135deg,#f5f0c0,#fdfce8)
+}
+[data-app-theme="orangecrush"]{
+  --navy:#5c2800;--teal:#d4682a;--teal-light:#e89060;
+  --sky:#f0b890;--sky-light:#faddc0;
+  --beige:#fdf3ec;--gray-100:#faddcc;--gray-200:#f0c4a0;
+  --grad-main:linear-gradient(135deg,#e8a070 0%,#f5c4a0 60%,#fdf3ec 100%);
+  --grad-card:linear-gradient(135deg,#d4682a 0%,#e89060 100%);
+  --grad-soft:linear-gradient(135deg,#faddcc,#fdf3ec)
+}
+[data-app-theme="pomegranate"]{
+  --navy:#5c1a1a;--teal:#c84040;--teal-light:#e07070;
+  --sky:#f0a8a8;--sky-light:#fad0d0;
+  --beige:#fdf0f0;--gray-100:#fad4d4;--gray-200:#f0b0b0;
+  --grad-main:linear-gradient(135deg,#e08080 0%,#f0b0b0 60%,#fdf0f0 100%);
+  --grad-card:linear-gradient(135deg,#c84040 0%,#e07070 100%);
+  --grad-soft:linear-gradient(135deg,#fad4d4,#fdf0f0)
+}
+[data-app-theme="cherryontop"]{
+  --navy:#5c1a38;--teal:#c84070;--teal-light:#e07090;
+  --sky:#f0a8c0;--sky-light:#fad0e0;
+  --beige:#fdf0f5;--gray-100:#fad4e4;--gray-200:#f0b0cc;
+  --grad-main:linear-gradient(135deg,#e080a8 0%,#f0b0c8 60%,#fdf0f5 100%);
+  --grad-card:linear-gradient(135deg,#c84070 0%,#e07090 100%);
+  --grad-soft:linear-gradient(135deg,#fad4e4,#fdf0f5)
+}
+
+/* SUNDAE DARK VARIANTS */
+[data-app-theme="passionfruit"][data-theme="dark"]{--white:#1e1428;--beige:#120c1c;--gray-100:#2a1e3c;--gray-200:#3d2e55;--gray-400:#b09ccc;--gray-600:#d0c0e8;--navy:#f0ecfc;--teal:#a07cc4}
+[data-app-theme="coolmint"][data-theme="dark"]{--white:#0d2420;--beige:#071815;--gray-100:#0d2420;--gray-200:#1a3d38;--gray-400:#6abfb5;--gray-600:#a8ddd8;--navy:#f0fafa;--teal:#3a9e8f}
+[data-app-theme="juicypear"][data-theme="dark"]{--white:#111e0c;--beige:#0a1408;--gray-100:#111e0c;--gray-200:#1e3414;--gray-400:#88c464;--gray-600:#b8dda0;--navy:#f2faee;--teal:#5a9e3a}
+[data-app-theme="honeyhoney"][data-theme="dark"]{--white:#2a1800;--beige:#1a0e00;--gray-100:#2a1800;--gray-200:#3d2500;--gray-400:#e0aa60;--gray-600:#f0cc90;--navy:#fdf6ec;--teal:#c8882a}
+[data-app-theme="lemonzest"][data-theme="dark"]{--white:#242000;--beige:#181500;--gray-100:#242000;--gray-200:#3a3400;--gray-400:#d4c840;--gray-600:#e8e088;--navy:#fdfce8;--teal:#b8a800}
+[data-app-theme="orangecrush"][data-theme="dark"]{--white:#2a1400;--beige:#1a0c00;--gray-100:#2a1400;--gray-200:#3d2000;--gray-400:#e89060;--gray-600:#f0b890;--navy:#fdf3ec;--teal:#d4682a}
+[data-app-theme="pomegranate"][data-theme="dark"]{--white:#280c0c;--beige:#1a0808;--gray-100:#280c0c;--gray-200:#3d1414;--gray-400:#e07070;--gray-600:#f0a8a8;--navy:#fdf0f0;--teal:#c84040}
+[data-app-theme="cherryontop"][data-theme="dark"]{--white:#280c1c;--beige:#1a0810;--gray-100:#280c1c;--gray-200:#3d142c;--gray-400:#e07090;--gray-600:#f0a8c0;--navy:#fdf0f5;--teal:#c84070}
+
 </style>
 </head>
 <body>
@@ -435,9 +611,27 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
 <div id="splash">
   <div class="splash-logo">Growth<span>+</span></div>
   <div class="splash-sub">Smart Finance for Gen Z</div>
-  <div class="splash-coco"><svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="36" cy="40" r="22" fill="#E8F0FF"/><polygon points="18,22 26,36 10,36" fill="#A8C4FF"/><polygon points="54,22 62,36 46,36" fill="#A8C4FF"/><polygon points="19,22 25,34 13,34" fill="#D0E4FF"/><polygon points="53,22 59,34 47,34" fill="#D0E4FF"/><circle cx="36" cy="42" r="20" fill="#EEF4FF"/><ellipse cx="28" cy="38" rx="5" ry="6" fill="white"/><ellipse cx="44" cy="38" rx="5" ry="6" fill="white"/><circle cx="28" cy="39" r="3.2" fill="#3A3560"/><circle cx="44" cy="39" r="3.2" fill="#3A3560"/><circle cx="29" cy="38" r="1.2" fill="white"/><circle cx="45" cy="38" r="1.2" fill="white"/><ellipse cx="36" cy="47" rx="4" ry="2.5" fill="#C8B4D0" opacity="0.6"/><circle cx="36" cy="46" r="2" fill="#D4A0C0"/><line x1="20" y1="45" x2="30" y2="47" stroke="#8A92A6" stroke-width="1.2" stroke-linecap="round"/><line x1="20" y1="48" x2="30" y2="48" stroke="#8A92A6" stroke-width="1.2" stroke-linecap="round"/><line x1="52" y1="45" x2="42" y2="47" stroke="#8A92A6" stroke-width="1.2" stroke-linecap="round"/><line x1="52" y1="48" x2="42" y2="48" stroke="#8A92A6" stroke-width="1.2" stroke-linecap="round"/><path d="M28 52Q36 57 44 52" stroke="#8070A0" stroke-width="2" stroke-linecap="round" fill="none"/><ellipse cx="22" cy="44" rx="5" ry="3" fill="#C8B4E8" opacity="0.5"/><ellipse cx="50" cy="44" rx="5" ry="3" fill="#C8B4E8" opacity="0.5"/><path d="M14 50C10 44 12 36 18 36" stroke="#A8C4FF" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M58 50C62 44 60 36 54 36" stroke="#A8C4FF" stroke-width="3" stroke-linecap="round" fill="none"/></svg></div>
+  <div class="splash-coco" id="splashEmoji" style="font-size:5rem;animation:bounce 1s infinite alternate;margin:0 auto;text-align:center">🦊</div>
   <div class="splash-bar"><div class="splash-fill"></div></div>
 </div>
+<script>
+(function() {
+  var emojis = ['🦊','🐶','🐱','🦁','🦊','🐶','🐱','🦁'];
+  var i = 0;
+  var el = document.getElementById('splashEmoji');
+  var timer = setInterval(function() {
+    if (!el) { clearInterval(timer); return; }
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.3s';
+    setTimeout(function() {
+      i = (i+1) % emojis.length;
+      el.textContent = emojis[i];
+      el.style.opacity = '1';
+    }, 300);
+  }, 600);
+  setTimeout(function() { clearInterval(timer); }, 2500);
+})();
+</script>
 
 <!-- ONBOARDING -->
 <div id="onboarding">
@@ -491,12 +685,10 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
   <div class="modal" style="position:relative;max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
     <button class="modal-close" onclick="closeModal('monthlyReportModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
-    <div class="modal-title" id="monthlyReportModalTitle">📊 Monthly Summary</div>
+    <div class="modal-title" id="monthlyReportModalTitle" style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;margin-right:6px;vertical-align:middle;color:var(--teal)"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Monthly Summary</div>
     <div id="monthlyReportModalContent"></div>
   </div>
 </div>
-
-
 
 <!-- MAIN APP -->
 <div id="app">
@@ -514,6 +706,44 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
   </div>
 
   <!-- PAGES -->
+
+  <!-- Sidebar (hidden by default, shown when desktop toggle ON) -->
+  <nav id="deskSidebar" style="display:none">
+    <div class="desk-nav-brand">
+      <div class="desk-nav-brand-logo">Growth<span>+</span></div>
+      <div class="desk-nav-brand-user" id="deskNavUser"></div>
+    </div>
+    <button class="desk-nav-item active" id="deskNav_pageHome" onclick="showPage('pageHome')">
+      <div class="dni-icon"><i data-feather="home" style="width:15px;height:15px"></i></div>
+      <span data-i18n="navHome">Beranda</span>
+    </button>
+    <button class="desk-nav-item" id="deskNav_pageTxn" onclick="showPage('pageTxn')">
+      <div class="dni-icon"><i data-feather="list" style="width:15px;height:15px"></i></div>
+      <span data-i18n="navTxn">Transaksi</span>
+    </button>
+    <button class="desk-nav-item" id="deskNav_pageAnalytics" onclick="showPage('pageAnalytics')">
+      <div class="dni-icon"><i data-feather="bar-chart-2" style="width:15px;height:15px"></i></div>
+      <span data-i18n="navAnalytics">Analitik</span>
+    </button>
+    <button class="desk-nav-item" id="deskNav_pageSavings" onclick="showPage('pageSavings')">
+      <div class="dni-icon"><i data-feather="target" style="width:15px;height:15px"></i></div>
+      <span data-i18n="navSavings">Tabungan</span>
+    </button>
+    <div class="desk-nav-divider"></div>
+    <button class="desk-nav-item" id="deskNav_pageSettings" onclick="showPage('pageSettings')">
+      <div class="dni-icon"><i data-feather="settings" style="width:15px;height:15px"></i></div>
+      <span data-i18n="settings">Pengaturan</span>
+    </button>
+    <div style="flex:1"></div>
+    <button onclick="openModal('txnModal')" class="btn-primary" style="margin-top:8px;padding:11px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:0.83rem;width:100%">
+      <i data-feather="plus" style="width:14px;height:14px"></i>
+      <span data-i18n="addTransaction">Tambah Transaksi</span>
+    </button>
+  </nav>
+
+  <!-- Pages scroll wrap -->
+  <div id="deskPagesWrap">
+
   <div id="pageHome" class="page active">
     <div class="content">
       <!-- GREETING -->
@@ -563,7 +793,7 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
               <circle cx="40" cy="40" r="32" fill="none" stroke="#e2e8f0" stroke-width="8"/>
               <circle id="srCircle" cx="40" cy="40" r="32" fill="none" stroke="var(--teal)" stroke-width="8" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="201"/>
             </svg>
-            <div class="sr-text"><span id="srNum">0</span><small>%</small></div>
+            <div class="sr-text"><span id="srNum">0%</span></div>
           </div>
           <div class="sr-status">
             <div class="sr-label" id="srLbl">Menghitung...</div>
@@ -625,7 +855,7 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
 
       <!-- MONTHLY REPORT -->
       <div class="section" id="monthlyReportSection">
-        <div class="sec-header"><div class="sec-title" data-i18n="monthlyReportTitle">📊 Rekap Akhir Bulan</div></div>
+        <div class="sec-header"><div class="sec-title" data-i18n="monthlyReportTitle" style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;align-items:center;margin-right:6px;vertical-align:middle;color:var(--teal)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Rekap Akhir Bulan</div></div>
         <div id="monthlyReportCard"></div>
       </div>
 
@@ -633,6 +863,24 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
       <div class="section">
         <div class="sec-header"><div class="sec-title" data-i18n="insights">Wawasan Pengeluaran</div></div>
         <div id="insightsContainer"></div>
+      </div>
+
+      <!-- DAILY SPENDING SUMMARY -->
+      <div class="section">
+        <div class="sec-header"><div class="sec-title" id="dailySumTitle" style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;align-items:center;margin-right:6px;vertical-align:middle;color:var(--teal)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>Daily Summary</div></div>
+        <div id="dailySummaryCard" style="background:var(--white);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm)"></div>
+      </div>
+
+      <!-- FINANCIAL HEALTH SCORE -->
+      <div class="section">
+        <div class="sec-header"><div class="sec-title" id="fhTitle" style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;align-items:center;margin-right:6px;vertical-align:middle;color:#ef4444"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></span>Financial Health</div></div>
+        <div id="financialHealthCard" style="background:var(--white);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm)"></div>
+      </div>
+
+      <!-- SMART BUDGET RECOMMENDATION -->
+      <div class="section">
+        <div class="sec-header"><div class="sec-title" id="smartBudTitle" style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;align-items:center;margin-right:6px;vertical-align:middle;color:var(--teal)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></span>Smart Budget</div></div>
+        <div id="smartBudgetCard" style="background:var(--white);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm)"></div>
       </div>
 
       <!-- COIN FLIP GAME -->
@@ -771,6 +1019,32 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
           <div class="sec-link" onclick="openModal('recurringModal')" data-i18n="manage">Kelola</div>
         </div>
         <div class="settings-item">
+          <div class="si-left"><div class="si-icon"><i data-feather="monitor" style="width:16px;height:16px;color:var(--teal)"></i></div>
+            <div>
+              <div data-i18n="desktopView" style="font-size:0.9rem;font-weight:500;color:var(--navy)">Tampilan Desktop</div>
+              <div data-i18n="desktopViewSub" style="font-size:0.74rem;color:var(--gray-400);margin-top:1px">Layout sidebar untuk layar besar</div>
+            </div>
+          </div>
+          <div class="toggle" id="desktopToggle" onclick="toggleDesktopView()"></div>
+        </div>
+        <div class="settings-item">
+          <div class="si-left"><div class="si-icon"><i data-feather="refresh-cw" style="width:16px;height:16px;color:var(--teal)"></i></div>
+            <div>
+              <div data-i18n="dataTransfer" style="font-size:0.9rem;font-weight:500;color:var(--navy)">Transfer Data</div>
+              <div data-i18n="dataTransferSub" style="font-size:0.74rem;color:var(--gray-400);margin-top:1px">Backup &amp; sinkron antar perangkat</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="exportJSON()" style="background:var(--grad-card);color:#fff;border:none;border-radius:99px;padding:7px 12px;font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+              <i data-feather="upload" style="width:12px;height:12px"></i><span data-i18n="exportData">Ekspor</span>
+            </button>
+            <button onclick="triggerImportJSON()" style="background:none;border:2px solid var(--teal);color:var(--teal);border-radius:99px;padding:5px 12px;font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+              <i data-feather="download" style="width:12px;height:12px"></i><span data-i18n="importData">Impor</span>
+            </button>
+            <input type="file" id="importJSONInput" accept=".json" style="display:none" onchange="handleImportJSON(this)"/>
+          </div>
+        </div>
+        <div class="settings-item">
           <div class="si-left"><div class="si-icon"><i data-feather="trash-2" style="width:16px;height:16px;color:var(--danger)"></i></div><span style="color:var(--danger)" data-i18n="clearData">Hapus Semua Data</span></div>
           <div class="sec-link" style="color:var(--danger)" onclick="clearAllData()" data-i18n="reset">Reset</div>
         </div>
@@ -778,11 +1052,12 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
 
       <!-- TEMA -->
       <div style="background:var(--white);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow-sm)">
-        <div style="font-size:0.9rem;font-weight:700;color:var(--navy);margin-bottom:16px" data-i18n="appTheme">Tema Aplikasi</div>
+        <div style="font-size:0.9rem;font-weight:700;color:var(--navy);margin-bottom:14px" data-i18n="appTheme">Tema Aplikasi</div>
+        <div style="font-size:0.78rem;font-weight:700;color:var(--gray-400);margin-bottom:10px;letter-spacing:0.04em">✦ Seasonal Palette</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="themeGrid">
           <div class="theme-card" data-theme-name="default" onclick="setTheme('default')">
             <div class="theme-preview" style="background:linear-gradient(135deg,#B0A0C8,#87CEEB,#ffffff)"></div>
-            <div class="theme-label">Spring 🌸</div>
+            <div class="theme-label">Spring</div>
           </div>
           <div class="theme-card" data-theme-name="fairy" onclick="setTheme('fairy')">
             <div class="theme-preview" style="background:linear-gradient(135deg,#1a4a2e,#2d9e5f,#f472b6)"></div>
@@ -790,20 +1065,60 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
           </div>
           <div class="theme-card" data-theme-name="autumn" onclick="setTheme('autumn')">
             <div class="theme-preview" style="background:linear-gradient(135deg,#E8820C,#F5C842,#ffffff)"></div>
-            <div class="theme-label">Autumn 🍂</div>
+            <div class="theme-label">Autumn</div>
           </div>
           <div class="theme-card" data-theme-name="winter" onclick="setTheme('winter')">
             <div class="theme-preview" style="background:linear-gradient(135deg,#5B7FA6,#B0C8D8,#ffffff)"></div>
-            <div class="theme-label">Winter ❄️</div>
+            <div class="theme-label">Winter</div>
           </div>
         </div>
-      </div>
+
+        <!-- SUNDAE PALETTE -->
+        <div style="margin-top:16px;border-top:1px solid var(--gray-100);padding-top:14px">
+          <div style="font-size:0.78rem;font-weight:700;color:var(--gray-400);margin-bottom:10px;letter-spacing:0.04em" id="sundaePaletteLabel">✦ Sundae Palette</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="sundaeThemeGrid">
+            <div class="theme-card" data-theme-name="passionfruit" onclick="setTheme('passionfruit')">
+              <div class="theme-preview" style="background:linear-gradient(135deg,#c5b4e0,#ddd4f0,#f5f0fc)"></div>
+              <div class="theme-label">Passionfruit Pop</div>
+            </div>
+            <div class="theme-card" data-theme-name="coolmint" onclick="setTheme('coolmint')">
+              <div class="theme-preview" style="background:linear-gradient(135deg,#8ecfca,#b8e8e4,#f0fafa)"></div>
+              <div class="theme-label">Cool Mint</div>
+            </div>
+            <div class="theme-card" data-theme-name="juicypear" onclick="setTheme('juicypear')">
+              <div class="theme-preview" style="background:linear-gradient(135deg,#a8d888,#c8eaac,#f2faee)"></div>
+              <div class="theme-label">Juicy Pear</div>
+            </div>
+            <div class="theme-card" data-theme-name="honeyhoney" onclick="setTheme('honeyhoney')">
+              <div class="theme-preview" style="background:linear-gradient(135deg,#eac87a,#f5dca8,#fdf6ec)"></div>
+              <div class="theme-label">Honey Honey</div>
+            </div>
+            <div class="theme-card" data-theme-name="lemonzest" onclick="setTheme('lemonzest')">
+              <div class="theme-preview" style="background:linear-gradient(135deg,#e0d870,#eeea9c,#fdfce8)"></div>
+              <div class="theme-label">Lemon Zest</div>
+            </div>
+            <div class="theme-card" data-theme-name="orangecrush" onclick="setTheme('orangecrush')">
+              <div class="theme-preview" style="background:linear-gradient(135deg,#e8a070,#f5c4a0,#fdf3ec)"></div>
+              <div class="theme-label">Orange Crush</div>
+            </div>
+            <div class="theme-card" data-theme-name="pomegranate" onclick="setTheme('pomegranate')">
+              <div class="theme-preview" style="background:linear-gradient(135deg,#e08080,#f0b0b0,#fdf0f0)"></div>
+              <div class="theme-label">Pomegranate Fizz</div>
+            </div>
+            <div class="theme-card" data-theme-name="cherryontop" onclick="setTheme('cherryontop')">
+              <div class="theme-preview" style="background:linear-gradient(135deg,#e080a8,#f0b0c8,#fdf0f5)"></div>
+              <div class="theme-label">Cherry on Top</div>
+            </div>
+          </div>
+        </div>
+        </div>
 
       <div style="text-align:center;padding:40px 0 20px;color:var(--gray-400);font-size:0.72rem">
         Made by. Aditya, C. Using Anthropic by Claude
       </div>
     </div>
   </div>
+  </div><!-- /deskPagesWrap -->
 </div>
 
 <!-- BOTTOM NAV -->
@@ -844,7 +1159,7 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
     </div>
     <div class="form-group">
       <label class="form-label" data-i18n="amount">Jumlah (Rp)</label>
-      <input class="inp" type="number" id="txnAmount" placeholder="0" style="margin:0"/>
+      <input class="inp" type="text" id="txnAmount" placeholder="0" style="margin:0" oninput="formatAmountInput(this)" inputmode="numeric"/>
     </div>
     <div class="form-group">
       <label class="form-label" data-i18n="category">Kategori</label>
@@ -960,6 +1275,83 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
   </div>
 </div>
 
+<!-- TOAST NOTIFICATION -->
+<div id="toast" class="toast">
+  <div class="toast-icon" id="toastIcon">✓</div>
+  <div class="toast-msg" id="toastMsg"></div>
+</div>
+
+<!-- PARTIAL PAYMENT MODAL -->
+<div class="modal-overlay" id="partialPayModal">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('partialPayModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
+    <div class="modal-title" id="partialPayTitle">Bayar Utang</div>
+    <div id="partialPayInfo" style="background:var(--gray-100);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;font-size:0.85rem;color:var(--gray-600)"></div>
+    <div class="form-group">
+      <label class="form-label" id="partialPayLabel">Jumlah Pembayaran</label>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button id="partialPayFullBtn" onclick="confirmPartialPay('full')" class="btn-primary" style="padding:14px;font-size:0.95rem"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> <span id="partialFullText">Lunas Penuh</span></button>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1;height:1px;background:var(--gray-200)"></div>
+          <span id="partialOrText" style="font-size:0.78rem;color:var(--gray-400);font-weight:600">atau</span>
+          <div style="flex:1;height:1px;background:var(--gray-200)"></div>
+        </div>
+        <div>
+          <label class="form-label" id="partialAmtLabel">Bayar Sebagian (Rp)</label>
+          <input class="inp" type="text" id="partialPayAmount" placeholder="0" style="margin:0" oninput="formatAmountInput(this)"/>
+        </div>
+        <button id="partialPayBtn" onclick="confirmPartialPay('partial')" style="width:100%;padding:14px;background:var(--grad-soft);border:2px solid var(--teal);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;color:var(--teal)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span id="partialPartText">Bayar Sebagian</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT AMOUNT MODAL -->
+<div class="modal-overlay" id="editAmountModal">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('editAmountModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
+    <div class="modal-title" id="editAmountTitle" style="display:flex;align-items:center;gap:8px"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Nominal</div>
+    <div id="editAmountInfo" style="background:var(--gray-100);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;font-size:0.85rem;color:var(--gray-600)"></div>
+    <div class="form-group">
+      <label class="form-label" id="editAmountLbl">Nominal Baru (Rp)</label>
+      <input class="inp" type="text" id="editAmountInput" placeholder="0" style="margin:0" oninput="formatAmountInput(this)"/>
+    </div>
+    <button class="btn-primary" id="editAmountSaveBtn" onclick="saveEditAmount()">Simpan Perubahan</button>
+  </div>
+</div>
+
+<!-- IMPORT JSON MODAL -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('importModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
+    <div class="modal-title" id="importModalTitle" style="display:flex;align-items:center;gap:8px">
+      <i data-feather="download" style="width:18px;height:18px;color:var(--teal)"></i>
+      Mode Import
+    </div>
+    <div id="importModalInfo" style="background:var(--grad-soft);border-radius:var(--radius-sm);padding:12px 14px;font-size:0.84rem;color:var(--gray-600);margin-bottom:16px;line-height:1.5"></div>
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <label style="flex:1;display:flex;align-items:flex-start;gap:10px;background:var(--gray-100);border-radius:var(--radius-sm);padding:12px;cursor:pointer;border:2px solid transparent;transition:var(--transition)">
+        <input type="radio" name="importMode" value="merge" checked style="accent-color:var(--teal);margin-top:2px;flex-shrink:0">
+        <div>
+          <div id="importMergeLbl" style="font-size:0.85rem;font-weight:700;color:var(--navy)">Gabung</div>
+          <div style="font-size:0.72rem;color:var(--gray-400);margin-top:2px" data-i18n="importMergeDesc">Tambah data baru, data lama tetap ada</div>
+        </div>
+      </label>
+      <label style="flex:1;display:flex;align-items:flex-start;gap:10px;background:var(--gray-100);border-radius:var(--radius-sm);padding:12px;cursor:pointer;border:2px solid transparent;transition:var(--transition)">
+        <input type="radio" name="importMode" value="replace" style="accent-color:var(--teal);margin-top:2px;flex-shrink:0">
+        <div>
+          <div id="importReplaceLbl" style="font-size:0.85rem;font-weight:700;color:var(--navy)">Timpa</div>
+          <div style="font-size:0.72rem;color:var(--gray-400);margin-top:2px" data-i18n="importReplaceDesc">Ganti semua data dengan file baru</div>
+        </div>
+      </label>
+    </div>
+    <button class="btn-primary" id="importConfirmBtn" onclick="confirmImport()">Import Data</button>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // I18N
@@ -987,6 +1379,16 @@ const i18n = {
     settings:"Settings", tapToEdit:"Tap below to edit profile",
     darkMode:"Dark Mode", language:"Language", setBudget:"Set Monthly Budget",
     recurringTxn:"Recurring Transactions", manage:"Manage",
+    desktopView:"Desktop View", desktopViewSub:"Sidebar layout for large screens",
+    dataTransfer:"Data Transfer", dataTransferSub:"Backup & sync between devices",
+    exportData:"Export JSON", importData:"Import JSON",
+    importSuccess:"Data imported successfully!", importError:"Invalid file. Use a Growth+ JSON backup.",
+    importMerge:"Merge", importReplace:"Replace",
+    importModeTitle:"Import Mode",
+    importMergeDesc:"Add new data, keep existing",
+    importReplaceDesc:"Replace all data with file",
+    svSource:"Funding Source", svFromBalance:"From Balance (deducted)", svFromOther:"Other Source",
+    svSourceNote:"Balance will be reduced by the deposited amount.",
     clearData:"Clear All Data", reset:"Reset", saveProfile:"Save Profile",
     addTransaction:"Add Transaction", amount:"Amount (Rp)", category:"Category",
     date:"Date", note:"Note", status:"Status", paid:"Paid", notPaid:"Not Paid",
@@ -1043,7 +1445,33 @@ const i18n = {
     svCustomPlaceholder:"Type savings location name...",
     catPlaceholder:"Select or type category...",
     notePlaceholder:"Optional note...",
-    other:"Other..."
+    other:"Other...",
+    partialPayDebt:"Pay Debt", partialPayRecv:"Collect Receivable",
+    partialPayFull:"Full Payment", partialPayPartial:"Partial Payment",
+    partialPayLabelDebt:"Payment Amount", partialPayLabelRecv:"Amount Received",
+    partialAmtLabelDebt:"Pay Partial (Rp)", partialAmtLabelRecv:"Receive Partial (Rp)",
+    partialOr:"or",
+    editAmount:"Edit Amount", editAmountLbl:"New Amount (Rp)", editAmountSaveBtnTxt:"Save Changes",
+    editAmountSaved:"Amount updated.",
+    partialSaved:"Partial payment recorded.", partialAmountError:"Enter a valid amount less than the total.",
+    dailySumTitle:"Daily Summary",
+    dailyNoTxn:"No transactions today yet.",
+    dailySpent:"Today you spent",
+    dailyMoreThan:"more than yesterday",
+    dailyLessThan:"less than yesterday",
+    dailySameAs:"Same as yesterday",
+    dailyYesterday:"Yesterday",
+    fhTitle:"Financial Health Score",
+    fhExcellent:"Excellent", fhGood:"Good", fhFair:"Fair", fhPoor:"Needs Work",
+    fhBudgetDiscipline:"Budget Discipline",
+    fhSavingRatio:"Saving Ratio",
+    fhSpendingHabit:"Spending Habit",
+    fhNoData:"Add transactions to see your health score.",
+    smartBudTitle:"Smart Budget Recommendation",
+    smartBudNoIncome:"Add income first to get budget recommendations.",
+    smartBudNeeds:"Needs (50%)",
+    smartBudWants:"Wants (30%)",
+    smartBudSavings:"Savings (20%)"
   },
   id: {
     onb1title:"Lacak Uangmu", onb1desc:"Pantau setiap pemasukan dan pengeluaran dengan mudah. Tahu ke mana uangmu pergi.",
@@ -1067,6 +1495,16 @@ const i18n = {
     settings:"Pengaturan", tapToEdit:"Ketuk di bawah untuk edit profil",
     darkMode:"Mode Gelap", language:"Bahasa", setBudget:"Atur Anggaran Bulanan",
     recurringTxn:"Transaksi Rutin", manage:"Kelola",
+    desktopView:"Tampilan Desktop", desktopViewSub:"Layout sidebar untuk layar besar",
+    dataTransfer:"Transfer Data", dataTransferSub:"Backup & sinkron antar perangkat",
+    exportData:"Ekspor JSON", importData:"Impor JSON",
+    importSuccess:"Data berhasil diimpor!", importError:"File tidak valid. Gunakan backup JSON dari Growth+.",
+    importMerge:"Gabung", importReplace:"Timpa",
+    importModeTitle:"Mode Import",
+    importMergeDesc:"Tambah data baru, data lama tetap ada",
+    importReplaceDesc:"Ganti semua data dengan file baru",
+    svSource:"Sumber Dana", svFromBalance:"Dari Saldo (dipotong)", svFromOther:"Sumber Lain",
+    svSourceNote:"Saldo akan berkurang sesuai jumlah yang ditabung.",
     clearData:"Hapus Semua Data", reset:"Reset", saveProfile:"Simpan Profil",
     addTransaction:"Tambah Transaksi", amount:"Jumlah (Rp)", category:"Kategori",
     date:"Tanggal", note:"Catatan", status:"Status", paid:"Lunas", notPaid:"Belum Lunas",
@@ -1083,7 +1521,7 @@ const i18n = {
     greetEvening:"Selamat malam",
     greetSub:"Sudah sejauh mana kamu mengelola keuangan?",
     wk_income:"Total Pemasukan", wk_expense:"Total Pengeluaran",
-    wk_top:"Kategori Terbesar", wk_rate:"Tingkat Tabungan",
+    wk_top:"Kategori Terbesar", wk_rate:"Tingkat Hemat",
     noTxn:"Belum ada transaksi. Ketuk + untuk menambah!",
     noSaving:"Belum ada tujuan tabungan.",
     coinGuess:"Tebak sisi koin yang keluar!",
@@ -1122,7 +1560,33 @@ const i18n = {
     svCustomPlaceholder:"Ketik nama tempat menabung...",
     catPlaceholder:"Pilih atau ketik kategori...",
     notePlaceholder:"Catatan opsional...",
-    other:"Lainnya..."
+    other:"Lainnya...",
+    partialPayDebt:"Bayar Utang", partialPayRecv:"Terima Piutang",
+    partialPayFull:"Lunas Penuh", partialPayPartial:"Bayar Sebagian",
+    partialPayLabelDebt:"Jumlah Pembayaran", partialPayLabelRecv:"Jumlah Diterima",
+    partialAmtLabelDebt:"Bayar Sebagian (Rp)", partialAmtLabelRecv:"Terima Sebagian (Rp)",
+    partialOr:"atau",
+    editAmount:"Edit Nominal", editAmountLbl:"Nominal Baru (Rp)", editAmountSaveBtnTxt:"Simpan Perubahan",
+    editAmountSaved:"Nominal berhasil diubah.",
+    partialSaved:"Pembayaran sebagian tercatat.", partialAmountError:"Masukkan nominal yang valid dan kurang dari total.",
+    dailySumTitle:"Ringkasan Harian",
+    dailyNoTxn:"Belum ada transaksi hari ini.",
+    dailySpent:"Hari ini kamu menghabiskan",
+    dailyMoreThan:"lebih dari kemarin",
+    dailyLessThan:"lebih hemat dari kemarin",
+    dailySameAs:"Sama seperti kemarin",
+    dailyYesterday:"Kemarin",
+    fhTitle:"Skor Kesehatan Finansial",
+    fhExcellent:"Luar Biasa", fhGood:"Bagus", fhFair:"Cukup", fhPoor:"Perlu Perbaikan",
+    fhBudgetDiscipline:"Disiplin Anggaran",
+    fhSavingRatio:"Rasio Tabungan",
+    fhSpendingHabit:"Kebiasaan Belanja",
+    fhNoData:"Tambah transaksi untuk melihat skor kesehatan finansialmu.",
+    smartBudTitle:"Rekomendasi Anggaran Cerdas",
+    smartBudNoIncome:"Tambahkan pemasukan dulu untuk mendapatkan rekomendasi anggaran.",
+    smartBudNeeds:"Kebutuhan (50%)",
+    smartBudWants:"Keinginan (30%)",
+    smartBudSavings:"Tabungan (20%)"
   }
 };
 
@@ -1174,6 +1638,22 @@ function getCats(type) {
   return (CATEGORIES[state.lang] || CATEGORIES.id)[type] || CATEGORIES.id.expense;
 }
 
+// Terjemahkan nama kategori tersimpan sesuai bahasa aktif
+// misal: "Salary" (EN) → "Gaji" (ID), atau "Gaji" (ID) → "Salary" (EN)
+function translateCat(cat) {
+  if (!cat) return cat;
+  const types = ['income','expense','debt','receivable'];
+  const from = state.lang === 'id' ? 'en' : 'id';
+  const to   = state.lang;
+  for (const type of types) {
+    const fromList = CATEGORIES[from][type];
+    const toList   = CATEGORIES[to][type];
+    const idx = fromList.indexOf(cat);
+    if (idx !== -1 && toList[idx]) return toList[idx];
+  }
+  return cat; // kategori custom → tidak diubah
+}
+
 // ============================================================
 // STATE
 // ============================================================
@@ -1193,6 +1673,7 @@ let state = {
   calYear: new Date().getFullYear(),
   lastResetMonth: new Date().getMonth(),
   lastResetYear: new Date().getFullYear(),
+  desktopView: false,
   charts: {}
 };
 
@@ -1340,6 +1821,7 @@ function showApp() {
   document.getElementById('bottomNav').style.display = 'flex';
   checkMonthlyReset();
   updateAll();
+  applyDesktopMode();
   setTimeout(() => feather.replace(), 100);
   processRecurring();
 }
@@ -1357,9 +1839,14 @@ function updateAll() {
   renderInsights();
   renderImpulseAlerts();
   renderRecurringList();
+  renderDailySummary();
+  renderFinancialHealth();
+  renderSmartBudget();
   updateProfileUI();
   applyTheme();
   applyLang();
+  updateNewFeatureTitles();
+  applyDesktopMode();
   feather.replace();
 }
 
@@ -1398,7 +1885,7 @@ function getStats() {
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
 
-  let income=0, expense=0, debt=0, debtUnpaid=0, recv=0, recvPaid=0, debtPaid=0;
+  let income=0, expense=0, debt=0, debtUnpaid=0, recv=0, recvPaid=0, recvUnpaid=0, debtPaid=0;
   let monthIncome=0, monthExpense=0;
 
   // Saldo dihitung dari SEMUA transaksi (aktif + archived)
@@ -1413,46 +1900,74 @@ function getStats() {
     if (tx.type==='receivable') {
       recv += tx.amount;
       if (tx.status==='paid') recvPaid += tx.amount;
+      else recvUnpaid += tx.amount; // belum diterima = uang kita masih di luar
     }
   });
 
-  // Monthly hanya dari transaksi aktif bulan ini (untuk anggaran & savings rate)
+  // Tabungan dari saldo: kurangi saldo
+  const savingsFromBalance = state.savings
+    .filter(s => s.fromBalance)
+    .reduce((a,s) => a + s.current, 0);
+
+  // Monthly hanya dari transaksi aktif bulan ini
   state.transactions.forEach(tx => {
     const d = new Date(tx.date);
     const isThisMonth = d.getMonth()===thisMonth && d.getFullYear()===thisYear;
     if (!isThisMonth) return;
     if (tx.type==='income') monthIncome += tx.amount;
     if (tx.type==='expense') monthExpense += tx.amount;
-    // Hutang lunas = uang keluar, piutang lunas = uang masuk, keduanya mempengaruhi bulanan
     if (tx.type==='debt' && tx.status==='paid') monthExpense += tx.amount;
     if (tx.type==='receivable' && tx.status==='paid') monthIncome += tx.amount;
   });
 
   const savingsTotal = state.savings.reduce((a,s) => a + s.current, 0);
-  // Saldo: pemasukan + piutang_lunas - pengeluaran - hutang_lunas (hutang belum lunas belum ngurangin saldo)
-  const balance = income + recvPaid - expense - debtPaid;
 
-  return {income, expense, debt, debtPaid, debtUnpaid, recv, recvPaid, balance, savingsTotal, monthExpense, monthIncome};
+  // LOGIKA SALDO BARU:
+  // - Piutang belum lunas: mengurangi saldo (uang sudah keluar, belum kembali)
+  // - Piutang lunas: saldo kembali (recvPaid sudah masuk di atas)
+  // - Tabungan dari saldo: mengurangi saldo
+  const balance = income + recvPaid - expense - debtPaid - recvUnpaid - savingsFromBalance;
+
+  return {income, expense, debt, debtPaid, debtUnpaid, recv, recvPaid, recvUnpaid, balance, savingsTotal, savingsFromBalance, monthExpense, monthIncome};
 }
 
 function updateBalanceDisplay() {
-  const {income, expense, debt, debtPaid, debtUnpaid, recv, balance, savingsTotal} = getStats();
+  const {income, expense, debt, debtPaid, debtUnpaid, recv, recvUnpaid, balance, savingsTotal} = getStats();
   const recurCount = state.transactions.filter(tx => tx.recurring && tx.recurring !== 'none').length;
 
   animateValue('balanceDisplay', balance);
   document.getElementById('incomeDisplay').textContent = fmtRp(income);
   document.getElementById('expenseDisplay').textContent = fmtRp(expense + debtPaid);
   document.getElementById('savingsDisplay').textContent = fmtRp(savingsTotal);
-  document.getElementById('debtDisplay').textContent = fmtRp(debtUnpaid); // hanya hutang belum lunas
-  document.getElementById('recvDisplay').textContent = fmtRp(recv);
+  document.getElementById('debtDisplay').textContent = fmtRp(debtUnpaid);
+  document.getElementById('recvDisplay').textContent = fmtRp(recv); // total piutang
   document.getElementById('recurDisplay').textContent = recurCount;
 }
 
 function animateValue(id, val) {
   const el = document.getElementById(id);
   const isNegative = val < 0;
-  el.textContent = (isNegative ? '-' : '') + fmtRp(Math.abs(val));
+  const abs = Math.abs(val);
+  el.textContent = (isNegative ? '-' : '') + fmtRp(abs);
   el.style.color = isNegative ? '#fca5a5' : '#fff';
+
+  // Responsive font size based on magnitude
+  if (abs >= 100000000000) {        // ≥ 100 milyar
+    el.style.fontSize = '1.1rem';
+  } else if (abs >= 10000000000) {  // ≥ 10 milyar
+    el.style.fontSize = '1.25rem';
+  } else if (abs >= 1000000000) {   // ≥ 1 milyar
+    el.style.fontSize = '1.45rem';
+  } else if (abs >= 100000000) {    // ≥ 100 juta
+    el.style.fontSize = '1.65rem';
+  } else if (abs >= 10000000) {     // ≥ 10 juta
+    el.style.fontSize = '1.9rem';
+  } else if (abs >= 1000000) {      // ≥ 1 juta
+    el.style.fontSize = '2.1rem';
+  } else {
+    el.style.fontSize = '2.4rem';   // default
+  }
+
   el.classList.add('animate');
   setTimeout(() => el.classList.remove('animate'), 400);
 }
@@ -1482,16 +1997,16 @@ function updateSavingBadge() {
 
   const badges = state.lang === 'en'
     ? [
-        { icon: '🥉', name: 'Bronze', desc: '1 week of consistent saving!' },
-        { icon: '🥈', name: 'Silver', desc: '2 weeks of consistent saving!' },
-        { icon: '🥇', name: 'Gold', desc: '3 weeks of consistent saving!' },
-        { icon: '💎', name: 'Diamond', desc: '4 weeks of consistent saving!' },
+        { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cd7f32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/><text x="12" y="11" text-anchor="middle" font-size="6" fill="#cd7f32" stroke="none" font-weight="bold">3</text></svg>`, name: 'Bronze', desc: '1 week of consistent saving!' },
+        { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c0c0c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/><text x="12" y="11" text-anchor="middle" font-size="6" fill="#c0c0c0" stroke="none" font-weight="bold">2</text></svg>`, name: 'Silver', desc: '2 weeks of consistent saving!' },
+        { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffd700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/><text x="12" y="11" text-anchor="middle" font-size="6" fill="#ffd700" stroke="none" font-weight="bold">1</text></svg>`, name: 'Gold', desc: '3 weeks of consistent saving!' },
+        { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l7.59 7.59a2.41 2.41 0 0 0 3.41 0l7.59-7.59a2.41 2.41 0 0 0 0-3.41L13.7 2.71a2.41 2.41 0 0 0-3.41 0L2.7 10.3z"/></svg>`, name: 'Diamond', desc: '4 weeks of consistent saving!' },
       ]
     : [
-        { icon: '🥉', name: 'Perunggu', desc: '1 minggu konsisten nabung!' },
-        { icon: '🥈', name: 'Perak', desc: '2 minggu konsisten nabung!' },
-        { icon: '🥇', name: 'Emas', desc: '3 minggu konsisten nabung!' },
-        { icon: '💎', name: 'Diamond', desc: '4 minggu konsisten nabung!' },
+        { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cd7f32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/><text x="12" y="11" text-anchor="middle" font-size="6" fill="#cd7f32" stroke="none" font-weight="bold">3</text></svg>`, name: 'Perunggu', desc: '1 minggu konsisten nabung!' },
+        { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c0c0c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/><text x="12" y="11" text-anchor="middle" font-size="6" fill="#c0c0c0" stroke="none" font-weight="bold">2</text></svg>`, name: 'Perak', desc: '2 minggu konsisten nabung!' },
+        { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffd700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/><text x="12" y="11" text-anchor="middle" font-size="6" fill="#ffd700" stroke="none" font-weight="bold">1</text></svg>`, name: 'Emas', desc: '3 minggu konsisten nabung!' },
+        { icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l7.59 7.59a2.41 2.41 0 0 0 3.41 0l7.59-7.59a2.41 2.41 0 0 0 0-3.41L13.7 2.71a2.41 2.41 0 0 0-3.41 0L2.7 10.3z"/></svg>`, name: 'Diamond', desc: '4 minggu konsisten nabung!' },
       ];
 
   const badge = streak > 0 ? badges[Math.min(streak, 4) - 1] : null;
@@ -1570,7 +2085,7 @@ function updateSavingsRate() {
   }
   rate = Math.min(rate, 100);
 
-  document.getElementById('srNum').textContent = rate;
+  document.getElementById('srNum').textContent = rate + '%';
   const circumference = 201;
   const offset = circumference - (circumference * rate / 100);
   document.getElementById('srCircle').style.strokeDashoffset = offset;
@@ -1678,8 +2193,18 @@ function selectCatChip(el, cat) {
 }
 
 // ============================================================
-// TRANSACTIONS
+// FORMAT AMOUNT WITH DOTS (1000 → 1.000)
 // ============================================================
+function formatAmountInput(inp) {
+  let raw = inp.value.replace(/\./g, '').replace(/[^0-9]/g, '');
+  if (raw === '') { inp.value = ''; return; }
+  inp.value = parseInt(raw, 10).toLocaleString('id-ID');
+}
+
+function getAmountValue(inp) {
+  return parseFloat((inp.value||'0').replace(/\./g, '').replace(/,/g,'.')) || 0;
+}
+
 function setTxnType(type) {
   state.currentTxnType = type;
   document.querySelectorAll('.type-tab').forEach(b => {
@@ -1718,7 +2243,8 @@ function showFieldError(inputId, msg) {
 }
 
 function addTransaction() {
-  const amount = parseFloat(document.getElementById('txnAmount').value);
+  const amtInp = document.getElementById('txnAmount');
+  const amount = getAmountValue(amtInp);
   if (!amount || amount <= 0) {
     showFieldError('txnAmount', t('fieldAmountMsg'));
     return;
@@ -1747,13 +2273,21 @@ function addTransaction() {
 
   state.transactions.unshift(txn);
   saveState();
-  closeModal('txnModal');
-  updateAll();
-  showToast(t('savedOK'));
-  document.getElementById('txnAmount').value = '';
+
+  // Reset semua field SEBELUM close agar bersih
+  amtInp.value = '';
   document.getElementById('txnCategory').value = '';
   document.getElementById('txnNote').value = '';
+  document.getElementById('txnRecurring').value = 'none';
+  document.getElementById('txnStatus').value = 'not_paid';
+  document.getElementById('txnDate').value = new Date().toISOString().split('T')[0];
   document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('selected'));
+  // Reset ke type income
+  setTxnType('income');
+
+  closeModal('txnModal');
+  updateAll();
+  showToast(t('savedOK'),'✓');
 }
 
 function deleteTransaction(id) {
@@ -1787,7 +2321,7 @@ function renderTxnItem(txn) {
       <i data-feather="${icon}" style="width:18px;height:18px;color:${color}"></i>
     </div>
     <div class="txn-info">
-      <div class="txn-cat">${escHtml(txn.category)} ${recHtml}</div>
+      <div class="txn-cat">${escHtml(translateCat(txn.category))} ${recHtml}</div>
       <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
         ${(txn.type==='debt'||txn.type==='receivable') ? `<span class="status-badge ${txn.status==='paid'?'status-paid':'status-unpaid'}" style="cursor:pointer" onclick="event.stopPropagation();openEditStatus(${txn.id})" title="Tap untuk edit status">${txn.status==='paid'?t('paid'):t('notPaid')}</span>` : ''}
       </div>
@@ -1796,7 +2330,10 @@ function renderTxnItem(txn) {
     <div class="txn-right">
       <div class="txn-amt" style="color:${amtColor}">${amtSign}${fmtRp(txn.amount)}</div>
       <div class="txn-date">${txn.date}</div>
-      <button onclick="event.stopPropagation();deleteTransaction(${txn.id})" style="margin-top:4px;background:none;border:1px solid #fca5a5;border-radius:6px;padding:2px 8px;font-size:0.7rem;color:var(--danger);cursor:pointer;font-family:var(--font)">✕ ${t('deletedOK').replace('.','')}</button>
+      <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end">
+        <button onclick="event.stopPropagation();openEditAmount(${txn.id})" style="background:none;border:1px solid var(--gray-200);border-radius:6px;padding:2px 8px;font-size:0.7rem;color:var(--teal);cursor:pointer;font-family:var(--font)"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button onclick="event.stopPropagation();deleteTransaction(${txn.id})" style="background:none;border:1px solid #fca5a5;border-radius:6px;padding:2px 8px;font-size:0.7rem;color:var(--danger);cursor:pointer;font-family:var(--font)">✕ ${t('deletedOK').replace('.','')}</button>
+      </div>
     </div>
   </div>`;
 }
@@ -1825,30 +2362,42 @@ function renderRecentTxn() {
   });
 
   const typeColorMap = { income:'var(--success)', expense:'var(--danger)', debt:'var(--warning)', receivable:'var(--teal)' };
-  const typeLabelMap = () => ({ income: t('txnIncome'), expense: t('txnExpense'), debt: t('txnDebt'), receivable: t('txnReceivable') });
+  const chevronSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 
   let html = '';
-  sortedGroups.forEach(([cat, txns]) => {
+  sortedGroups.forEach(([cat, txns], groupIdx) => {
     const totalAmt = txns.reduce((s, tx) => s + tx.amount, 0);
-    // Determine dominant type in this category
     const typeCounts = {};
     txns.forEach(tx => { typeCounts[tx.type] = (typeCounts[tx.type]||0) + 1; });
     const dominantType = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1])[0][0];
     const dotClassMap = { income:'dot-income', expense:'dot-expense', debt:'dot-debt', receivable:'dot-receivable' };
+    const typeLabelMap = { income: t('txnIncome'), expense: t('txnExpense'), debt: t('txnDebt'), receivable: t('txnReceivable') };
     const amtColor = (dominantType==='income'||dominantType==='receivable') ? 'var(--success)' : 'var(--danger)';
+    const groupId = `rcg_${groupIdx}`;
+    const tapHint = state.lang === 'id' ? 'Ketuk untuk melihat rincian' : 'Tap to see details';
 
     html += `
-    <div style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px 6px 0;border-bottom:2px solid var(--gray-100);margin-bottom:6px">
-        <div style="display:flex;align-items:center;gap:8px">
+    <div style="margin-bottom:10px;border-radius:var(--radius-sm);overflow:hidden;box-shadow:var(--shadow-sm);border:1px solid var(--gray-100)">
+
+      <!-- GROUP HEADER — clickable -->
+      <div onclick="toggleRecentGroup('${groupId}')"
+           style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--white);cursor:pointer;user-select:none;transition:background 0.2s"
+           onmouseenter="this.style.background='var(--gray-100)'" onmouseleave="this.style.background='var(--white)'">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0">
           <span class="type-dot ${dotClassMap[dominantType]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0"></span>
-          <span style="font-size:0.82rem;font-weight:700;color:var(--navy)">${escHtml(cat)}</span>
-          <span style="font-size:0.72rem;font-weight:600;color:var(--gray-400);background:var(--gray-100);padding:1px 7px;border-radius:99px">${txns.length} ${t('txnCount')}</span>
+          <span style="font-size:0.86rem;font-weight:700;color:var(--navy)">${escHtml(translateCat(cat))}</span>
+          <span style="font-size:0.7rem;font-weight:600;color:${typeColorMap[dominantType]};background:var(--gray-100);padding:1px 7px;border-radius:99px">${typeLabelMap[dominantType]||dominantType}</span>
+          <span style="font-size:0.7rem;font-weight:600;color:var(--gray-400);background:var(--gray-100);padding:1px 7px;border-radius:99px">${txns.length} ${t('txnCount')}</span>
         </div>
-        <span style="font-size:0.85rem;font-weight:800;color:${amtColor}">${fmtRp(totalAmt)}</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span style="font-size:0.88rem;font-weight:800;color:${amtColor}">${fmtRp(totalAmt)}</span>
+          <span id="${groupId}_chevron" style="color:var(--gray-400);transition:transform 0.25s;display:flex;align-items:center">${chevronSvg}</span>
+        </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        ${txns.map(tx => {
+
+      <!-- GROUP DETAIL — collapsed by default -->
+      <div id="${groupId}" style="display:none;flex-direction:column;gap:0;background:var(--beige)">
+        ${txns.map((tx, i) => {
           const {bg,color,icon} = txnTypeColor(tx.type);
           const ac = (tx.type==='income'||tx.type==='receivable') ? 'var(--success)' : 'var(--danger)';
           const sign = (tx.type==='income'||tx.type==='receivable') ? '+' : '-';
@@ -1856,7 +2405,8 @@ function renderRecentTxn() {
             ? `<span class="rec-badge">${tx.recurring==='weekly'?t('weekly'):t('monthly')}</span>` : '';
           const statusHtml = (tx.type==='debt'||tx.type==='receivable')
             ? `<span class="status-badge ${tx.status==='paid'?'status-paid':'status-unpaid'}" style="cursor:pointer" onclick="event.stopPropagation();openEditStatus(${tx.id})">${tx.status==='paid'?t('paid'):t('notPaid')}</span>` : '';
-          return `<div class="txn-item fade-in" style="padding:10px 12px">
+          const borderTop = i > 0 ? 'border-top:1px solid var(--gray-100);' : '';
+          return `<div class="txn-item" style="padding:10px 14px;border-radius:0;box-shadow:none;${borderTop}background:var(--white);margin:0">
             <div class="txn-icon-wrap" style="background:${bg};width:34px;height:34px;border-radius:10px">
               <i data-feather="${icon}" style="width:15px;height:15px;color:${color}"></i>
             </div>
@@ -1869,7 +2419,10 @@ function renderRecentTxn() {
             </div>
             <div style="text-align:right;flex-shrink:0">
               <div style="font-size:0.88rem;font-weight:700;color:${ac}">${sign}${fmtRp(tx.amount)}</div>
-              <button onclick="event.stopPropagation();deleteTransaction(${tx.id})" style="margin-top:3px;background:none;border:1px solid var(--gray-200);border-radius:6px;padding:1px 7px;font-size:0.68rem;color:var(--danger);cursor:pointer;font-family:var(--font)">${t('deletedOK').replace('.','')}</button>
+              <div style="display:flex;gap:4px;margin-top:3px;justify-content:flex-end">
+                <button onclick="event.stopPropagation();openEditAmount(${tx.id})" style="background:none;border:1px solid var(--gray-200);border-radius:6px;padding:1px 7px;font-size:0.68rem;color:var(--teal);cursor:pointer;font-family:var(--font)"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button onclick="event.stopPropagation();deleteTransaction(${tx.id})" style="background:none;border:1px solid var(--gray-200);border-radius:6px;padding:1px 7px;font-size:0.68rem;color:var(--danger);cursor:pointer;font-family:var(--font)">${t('deletedOK').replace('.','')}</button>
+              </div>
             </div>
           </div>`;
         }).join('')}
@@ -1879,6 +2432,16 @@ function renderRecentTxn() {
 
   el.innerHTML = html;
   feather.replace();
+}
+
+function toggleRecentGroup(id) {
+  const panel = document.getElementById(id);
+  const chevron = document.getElementById(id + '_chevron');
+  if (!panel) return;
+  const isOpen = panel.style.display === 'flex';
+  panel.style.display = isOpen ? 'none' : 'flex';
+  panel.style.flexDirection = 'column';
+  if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 
 // ============================================================
@@ -1930,7 +2493,7 @@ function renderFullTxn(query='') {
     });
 
     if (!hasAny) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-text">${t('noTxn')}</div></div>`;
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--gray-200)"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="empty-text">${t('noTxn')}</div></div>`;
     } else {
       el.innerHTML = html;
       feather.replace();
@@ -1938,7 +2501,7 @@ function renderFullTxn(query='') {
   } else {
     const filtered = txns.filter(tx => tx.type === filter);
     if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-text">${t('noTxn')}</div></div>`;
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--gray-200)"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="empty-text">${t('noTxn')}</div></div>`;
     } else {
       const total = filtered.reduce((a, tx) => a + tx.amount, 0);
       const dotMap = { income:'dot-income', expense:'dot-expense', debt:'dot-debt', receivable:'dot-receivable' };
@@ -1993,26 +2556,42 @@ function renderSavings() {
   const el = document.getElementById('savingsList');
   if (!el) return;
   if (!state.savings.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">${t('noSaving')}</div></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--gray-200)"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><div class="empty-text">${t('noSaving')}</div></div>`;
     return;
   }
   el.innerHTML = state.savings.map(s => {
     const pct = Math.round(Math.min((s.current/s.target)*100, 100));
+    const sourceBadge = s.fromBalance
+      ? `<span style="background:#dbeafe;color:#1d4ed8;border-radius:99px;padding:2px 8px;font-size:0.68rem;font-weight:600;margin-left:6px">${t('svFromBalance')}</span>`
+      : `<span style="background:var(--gray-100);color:var(--gray-400);border-radius:99px;padding:2px 8px;font-size:0.68rem;font-weight:600;margin-left:6px">${t('svFromOther')}</span>`;
     return `<div class="saving-card">
       <div class="sv-header">
-        <div class="sv-name">${escHtml(s.name)}</div>
+        <div class="sv-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">${escHtml(s.name)}${sourceBadge}</div>
         <div class="sv-pct">${pct}%</div>
       </div>
       <div class="sv-bar-bg"><div class="sv-bar-fill" style="width:${pct}%"></div></div>
       <div class="sv-meta">
         <span>${fmtRp(s.current)} / ${fmtRp(s.target)}</span>
-        <span>🏦 ${escHtml(s.location)}</span>
+        <span><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="10" width="18" height="10" rx="1"/><path d="M3 10l9-7 9 7"/><line x1="12" y1="3" x2="12" y2="10"/></svg> ${escHtml(s.location)}</span>
       </div>
-      ${s.bank ? `<div style="font-size:0.75rem;color:var(--gray-400);margin-top:4px">📋 ${escHtml(s.bank)}</div>` : ''}
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <input type="number" class="inp" placeholder="Tambah jumlah..." id="svAdd_${s.id}" style="margin:0;flex:1;padding:8px 12px;font-size:0.85rem"/>
-        <button onclick="addToSavings(${s.id})" class="btn-primary" style="width:auto;padding:8px 16px;font-size:0.85rem">+</button>
-        <button onclick="deleteSaving(${s.id})" style="padding:8px;background:none;border:2px solid var(--gray-200);border-radius:8px;cursor:pointer;color:var(--danger);font-family:var(--font)">✕</button>
+      ${s.bank ? `<div style="font-size:0.75rem;color:var(--gray-400);margin-top:4px"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> ${escHtml(s.bank)}</div>` : ''}
+      <div style="margin-top:10px">
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <input type="text" class="inp" placeholder="${t('currentProgress').replace(' (Rp)','')+'...'}" id="svAdd_${s.id}" style="margin:0;flex:1;padding:8px 12px;font-size:0.85rem" oninput="formatAmountInput(this)" inputmode="numeric"/>
+          <button onclick="addToSavings(${s.id})" class="btn-primary" style="width:auto;padding:8px 16px;font-size:0.85rem">+</button>
+          <button onclick="deleteSaving(${s.id})" style="padding:8px;background:none;border:2px solid var(--gray-200);border-radius:8px;cursor:pointer;color:var(--danger);font-family:var(--font)">✕</button>
+        </div>
+        <div style="display:flex;gap:6px">
+          <label style="flex:1;display:flex;align-items:center;gap:6px;background:${s.fromBalance?'#dbeafe':'var(--gray-100)'};border:2px solid ${s.fromBalance?'#3b82f6':'var(--gray-200)'};border-radius:var(--radius-xs);padding:6px 10px;cursor:pointer;transition:var(--transition);font-size:0.76rem;font-weight:600;color:${s.fromBalance?'#1d4ed8':'var(--gray-400)'}">
+            <input type="radio" name="svSrc_${s.id}" value="balance" ${s.fromBalance?'checked':''} onchange="changeSavingSource(${s.id},'balance')" style="accent-color:#3b82f6;flex-shrink:0">
+            ${t('svFromBalance')}
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:6px;background:${!s.fromBalance?'var(--grad-soft)':'var(--gray-100)'};border:2px solid ${!s.fromBalance?'var(--teal)':'var(--gray-200)'};border-radius:var(--radius-xs);padding:6px 10px;cursor:pointer;transition:var(--transition);font-size:0.76rem;font-weight:600;color:${!s.fromBalance?'var(--teal)':'var(--gray-400)'}">
+            <input type="radio" name="svSrc_${s.id}" value="other" ${!s.fromBalance?'checked':''} onchange="changeSavingSource(${s.id},'other')" style="accent-color:var(--teal);flex-shrink:0">
+            ${t('svFromOther')}
+          </label>
+        </div>
+        ${s.fromBalance ? `<div style="font-size:0.72rem;color:#1d4ed8;margin-top:4px;opacity:0.8">${t('svSourceNote')}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2020,15 +2599,37 @@ function renderSavings() {
 
 function addToSavings(id) {
   const inp = document.getElementById('svAdd_'+id);
-  const amt = parseFloat(inp.value);
+  const amt = getAmountValue(inp);
   if (!amt || amt <= 0) return;
   const sv = state.savings.find(s => s.id === id);
   if (!sv) return;
+
+  // Cek saldo cukup jika sumber dari saldo
+  if (sv.fromBalance) {
+    const { balance } = getStats();
+    if (amt > balance) {
+      showToast(state.lang==='id'
+        ? `Saldo tidak cukup! Saldo: ${fmtRp(balance)}`
+        : `Insufficient balance! Balance: ${fmtRp(balance)}`, '!');
+      return;
+    }
+  }
+
   sv.current = Math.min(sv.current + amt, sv.target);
+  inp.value = '';
   saveState();
   renderSavings();
   updateBalanceDisplay();
-  showToast(t('savedOK'));
+  showToast(t('savedOK'), '✓');
+}
+
+function changeSavingSource(id, src) {
+  const sv = state.savings.find(s => s.id === id);
+  if (!sv) return;
+  sv.fromBalance = (src === 'balance');
+  saveState();
+  renderSavings();
+  updateBalanceDisplay();
 }
 
 function deleteSaving(id) {
@@ -2083,7 +2684,7 @@ function renderWeeklyReport() {
     <div class="rpt-title">${t('weeklyReport')}</div>
     <div class="rpt-row"><span class="rpt-key">${t('wk_income')}</span><span class="rpt-val" style="color:var(--success)">${fmtRp(wIncome)}</span></div>
     <div class="rpt-row"><span class="rpt-key">${t('wk_expense')}</span><span class="rpt-val" style="color:var(--danger)">${fmtRp(wExpense)}</span></div>
-    <div class="rpt-row"><span class="rpt-key">${t('wk_top')}</span><span class="rpt-val">${topCat?escHtml(topCat[0]):'—'}</span></div>
+    <div class="rpt-row"><span class="rpt-key">${t('wk_top')}</span><span class="rpt-val">${topCat?escHtml(translateCat(topCat[0])):'—'}</span></div>
     <div class="rpt-row"><span class="rpt-key">${t('wk_rate')}</span><span class="rpt-val" style="color:var(--teal)">${saveRate}%</span></div>
   `;
 }
@@ -2122,42 +2723,42 @@ function buildMonthlyReportHTML(year, month, full=false) {
   let apresiasiMsg = '', saranMsg = '', apresiasiClass = 'mr-note';
   if (state.lang === 'en') {
     if (saveRate >= 30) {
-      apresiasiMsg = `🎉 Amazing! Your savings rate is ${saveRate}% this month — well above average! This consistency is what will make your finances stronger going forward.`;
-      saranMsg = `💡 Keep the momentum! Consider starting investments or adding to long-term savings. If you have any unpaid debts, now's a great time to tackle them one by one.`;
+      apresiasiMsg = `Amazing! Your savings rate is ${saveRate}% this month — well above average! This consistency is what will make your finances stronger going forward.`;
+      saranMsg = `Keep the momentum! Consider starting investments or adding to long-term savings. If you have any unpaid debts, now's a great time to tackle them one by one.`;
     } else if (saveRate >= 20) {
-      apresiasiMsg = `👍 Great job! You saved ${saveRate}% this month. You're on the right track toward financial freedom!`;
-      saranMsg = `💡 Try raising your savings target to 25-30% next month. Review your biggest spending category — can you trim it a little?`;
+      apresiasiMsg = `Great job! You saved ${saveRate}% this month. You're on the right track toward financial freedom!`;
+      saranMsg = `Try raising your savings target to 25-30% next month. Review your biggest spending category — can you trim it a little?`;
     } else if (saveRate >= 10) {
-      apresiasiMsg = `✨ Not bad! You saved ${saveRate}% this month. But there's still room to grow.`;
-      saranMsg = `💡 Aim for at least 20% of income. Try the "pay yourself first" rule — set aside savings before spending.`;
+      apresiasiMsg = `Not bad! You saved ${saveRate}% this month. But there's still room to grow.`;
+      saranMsg = `Aim for at least 20% of income. Try the "pay yourself first" rule — set aside savings before spending.`;
       apresiasiClass = 'mr-note warn';
     } else if (income > 0) {
-      apresiasiMsg = `⚠️ Your savings rate this month is ${saveRate}% — there's a lot of room for improvement. But tracking is the first great step!`;
-      saranMsg = `💡 Priority next month: reduce spending in the ${topCat ? '"'+topCat[0]+'"' : 'largest'} category. Try setting a daily budget limit. Every little bit saved counts!`;
+      apresiasiMsg = `Your savings rate this month is ${saveRate}% — there's a lot of room for improvement. But tracking is the first great step!`;
+      saranMsg = `Priority next month: reduce spending in the ${topCat ? '"'+translateCat(topCat[0])+'"' : 'largest'} category. Try setting a daily budget limit. Every little bit saved counts!`;
       apresiasiClass = 'mr-note warn';
     } else {
-      apresiasiMsg = `📝 No income recorded this month yet. Start tracking all your transactions!`;
-      saranMsg = `💡 Record all income and expenses — even small ones. Complete data = better financial decisions.`;
+      apresiasiMsg = `No income recorded this month yet. Start tracking all your transactions!`;
+      saranMsg = `Record all income and expenses — even small ones. Complete data = better financial decisions.`;
       apresiasiClass = 'mr-note warn';
     }
   } else {
     if (saveRate >= 30) {
-      apresiasiMsg = `🎉 Luar biasa! Tingkat hemat kamu ${saveRate}% bulan ini — jauh di atas rata-rata! Konsistensi ini yang akan bikin finansialmu makin kuat ke depannya.`;
-      saranMsg = `💡 Pertahankan momentum ini! Pertimbangkan untuk mulai investasi atau tambah porsi tabungan jangka panjang. Kalau ada utang yang belum lunas, ini waktu yang tepat buat beresin satu per satu.`;
+      apresiasiMsg = `Luar biasa! Tingkat hemat kamu ${saveRate}% bulan ini — jauh di atas rata-rata! Konsistensi ini yang akan bikin finansialmu makin kuat ke depannya.`;
+      saranMsg = `Pertahankan momentum ini! Pertimbangkan untuk mulai investasi atau tambah porsi tabungan jangka panjang. Kalau ada utang yang belum lunas, ini waktu yang tepat buat beresin satu per satu.`;
     } else if (saveRate >= 20) {
-      apresiasiMsg = `👍 Bagus banget! Kamu berhasil hemat ${saveRate}% bulan ini. Kamu sudah di jalur yang benar menuju kebebasan finansial!`;
-      saranMsg = `💡 Coba naikkan target hemat jadi 25-30% bulan depan. Cek lagi kategori pengeluaran terbesar — ada yang bisa dikurangi dikit?`;
+      apresiasiMsg = `Bagus banget! Kamu berhasil hemat ${saveRate}% bulan ini. Kamu sudah di jalur yang benar menuju kebebasan finansial!`;
+      saranMsg = `Coba naikkan target hemat jadi 25-30% bulan depan. Cek lagi kategori pengeluaran terbesar — ada yang bisa dikurangi dikit?`;
     } else if (saveRate >= 10) {
-      apresiasiMsg = `✨ Lumayan! Kamu hemat ${saveRate}% bulan ini. Tapi masih ada ruang untuk berkembang lebih baik lagi.`;
-      saranMsg = `💡 Target minimalnya 20% dari pemasukan ya. Coba terapkan aturan "bayar diri sendiri dulu" — sisihkan tabungan sebelum belanja.`;
+      apresiasiMsg = `Lumayan! Kamu hemat ${saveRate}% bulan ini. Tapi masih ada ruang untuk berkembang lebih baik lagi.`;
+      saranMsg = `Target minimalnya 20% dari pemasukan ya. Coba terapkan aturan "bayar diri sendiri dulu" — sisihkan tabungan sebelum belanja.`;
       apresiasiClass = 'mr-note warn';
     } else if (income > 0) {
-      apresiasiMsg = `⚠️ Bulan ini tingkat hematnya ${saveRate}% — masih perlu banyak perbaikan. Tapi yang penting kamu mau tracking, itu langkah pertama yang bagus!`;
-      saranMsg = `💡 Prioritas bulan depan: kurangi pengeluaran di kategori ${topCat ? '"'+topCat[0]+'"' : 'terbesar'}. Coba buat batas anggaran harian. Setiap Rp 10.000 yang dihemat itu berarti!`;
+      apresiasiMsg = `Bulan ini tingkat hematnya ${saveRate}% — masih perlu banyak perbaikan. Tapi yang penting kamu mau tracking, itu langkah pertama yang bagus!`;
+      saranMsg = `Prioritas bulan depan: kurangi pengeluaran di kategori ${topCat ? '"'+translateCat(topCat[0])+'"' : 'terbesar'}. Coba buat batas anggaran harian. Setiap Rp 10.000 yang dihemat itu berarti!`;
       apresiasiClass = 'mr-note warn';
     } else {
-      apresiasiMsg = `📝 Belum ada pemasukan tercatat bulan ini. Yuk mulai catat semua transaksimu agar bisa dipantau!`;
-      saranMsg = `💡 Catat semua pemasukan dan pengeluaranmu — sekecil apapun. Data yang lengkap = keputusan keuangan yang lebih baik.`;
+      apresiasiMsg = `Belum ada pemasukan tercatat bulan ini. Yuk mulai catat semua transaksimu agar bisa dipantau!`;
+      saranMsg = `Catat semua pemasukan dan pengeluaranmu — sekecil apapun. Data yang lengkap = keputusan keuangan yang lebih baik.`;
       apresiasiClass = 'mr-note warn';
     }
   }
@@ -2165,7 +2766,7 @@ function buildMonthlyReportHTML(year, month, full=false) {
   if (!full) {
     // Preview compact
     return `<div class="monthly-report-card">
-      <div class="mr-title">📊 ${monthName}</div>
+      <div class="mr-title" style="display:flex;align-items:center;gap:8px"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> ${monthName}</div>
       <div class="mr-grid">
         <div class="mr-item">
           <div class="mr-label">${t('mrIncome')}</div>
@@ -2223,7 +2824,7 @@ function buildMonthlyReportHTML(year, month, full=false) {
         <div class="mr-val" style="color:var(--teal)">${saveRate}%</div>
       </div>
     </div>
-    ${topCat ? `<div style="background:var(--gray-100);border-radius:var(--radius-xs);padding:12px;margin-bottom:14px;font-size:0.82rem;color:var(--gray-600)">🏆 ${t('mrTopCategory')}: <b>${escHtml(topCat[0])}</b> — ${fmtRp(topCat[1])}</div>` : ''}
+    ${topCat ? `<div style="background:var(--gray-100);border-radius:var(--radius-xs);padding:12px;margin-bottom:14px;font-size:0.82rem;color:var(--gray-600)"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg> ${t('mrTopCategory')}: <b>${escHtml(topCat[0])}</b> — ${fmtRp(topCat[1])}</div>` : ''}
     <div class="${apresiasiClass}" style="margin-bottom:12px">${apresiasiMsg}</div>
     <div class="mr-saran">${saranMsg}</div>
   `;
@@ -2239,7 +2840,9 @@ function renderMonthlyReport() {
 function openMonthlyReportModal(year, month) {
   const locale = state.lang === 'en' ? 'en-US' : 'id-ID';
   const monthName = new Date(year, month, 1).toLocaleString(locale, {month:'long', year:'numeric'});
-  document.getElementById('monthlyReportModalTitle').textContent = '📊 ' + monthName;
+  const mrTitleEl = document.getElementById('monthlyReportModalTitle');
+  mrTitleEl.style.display = 'flex'; mrTitleEl.style.alignItems = 'center'; mrTitleEl.style.gap = '8px';
+  mrTitleEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> ` + monthName;
   document.getElementById('monthlyReportModalContent').innerHTML = buildMonthlyReportHTML(year, month, true);
   openModal('monthlyReportModal');
 }
@@ -2272,8 +2875,8 @@ function renderInsights() {
   state.transactions.filter(tx=>tx.type==='expense'||tx.type==='debt').forEach(tx=>{ cats[tx.category]=(cats[tx.category]||0)+tx.amount; });
   const topCat = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
   if (topCat) insights.push(state.lang==='id'
-    ? `Kategori pengeluaran terbesar: ${topCat[0]} (${fmtRp(topCat[1])}).`
-    : `Largest spending category: ${topCat[0]} (${fmtRp(topCat[1])}).`);
+    ? `Kategori pengeluaran terbesar: ${translateCat(topCat[0])} (${fmtRp(topCat[1])}).`
+    : `Largest spending category: ${translateCat(topCat[0])} (${fmtRp(topCat[1])}).`);
 
   const savingRate = monthIncome > 0 ? Math.round(((monthIncome-monthExpense)/monthIncome)*100) : 0;
   insights.push(state.lang==='id'
@@ -2338,7 +2941,7 @@ function renderRecurringList() {
   if (!rec.length) { el.innerHTML=`<div class="empty-state"><div class="empty-text">${t('noRecurring')}</div></div>`; return; }
   el.innerHTML = rec.map(tx => `<div class="txn-item">
     <div class="txn-info">
-      <div class="txn-cat">${escHtml(tx.category)}</div>
+      <div class="txn-cat">${escHtml(translateCat(tx.category))}</div>
       <div class="txn-note">${tx.recurring==='weekly'?t('weekly'):t('monthly')} · ${tx.date}</div>
     </div>
     <div class="txn-right">
@@ -2358,27 +2961,32 @@ function renderCharts() {
 }
 
 function renderPieChart() {
-  const {income, expense, savingsTotal} = getStats();
+  const {income, expense, savingsTotal, debtUnpaid, recv, recvPaid, debtPaid} = getStats();
   const ctx = document.getElementById('pieChart');
   if (!ctx) return;
   if (state.charts.pie) state.charts.pie.destroy();
+  // expense sudah include debtPaid via updateBalanceDisplay, tapi di sini kita pisahkan
+  const paidExpense = expense + debtPaid;
+  const unpaidDebt = debtUnpaid;
+  const unpaidRecv = recv - recvPaid;
   state.charts.pie = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: [t('income'), t('expenses'), t('savings')],
+      labels: [t('income'), t('expenses'), t('savings'), t('debts') + ' (belum lunas)', t('receivable') + ' (belum diterima)'],
       datasets: [{
-        data: [income, expense, savingsTotal],
-        backgroundColor: ['#10b981','#ef4444','#38bdf8'],
+        data: [income, paidExpense, savingsTotal, unpaidDebt, unpaidRecv],
+        backgroundColor: ['#10b981','#ef4444','#38bdf8','#f59e0b','#6366f1'],
         borderWidth: 0
       }]
     },
-    options: {responsive:true, plugins:{legend:{position:'bottom',labels:{font:{family:'Nunito',size:11}}}}}
+    options: {responsive:true, plugins:{legend:{position:'bottom',labels:{font:{family:'Nunito',size:11},filter:(item)=>item.raw > 0}}}}
   });
 }
 
 function renderCatChart() {
   const cats = {};
-  state.transactions.filter(tx=>tx.type==='expense'||tx.type==='debt').forEach(tx=>{ cats[tx.category]=(cats[tx.category]||0)+tx.amount; });
+  // Hanya masukkan expense biasa dan debt yang SUDAH LUNAS
+  state.transactions.filter(tx=>(tx.type==='expense') || (tx.type==='debt' && tx.status==='paid')).forEach(tx=>{ cats[tx.category]=(cats[tx.category]||0)+tx.amount; });
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const ctx = document.getElementById('catChart');
   if (!ctx) return;
@@ -2417,7 +3025,10 @@ function renderTrendChart() {
       const td = new Date(tx.date);
       if (td.getMonth()===d.getMonth()&&td.getFullYear()===d.getFullYear()) {
         if (tx.type==='income') inc+=tx.amount;
-        if (tx.type==='expense'||tx.type==='debt') exp+=tx.amount;
+        if (tx.type==='income' && tx.type==='receivable' && tx.status==='paid') inc+=tx.amount;
+        if (tx.type==='expense') exp+=tx.amount;
+        // Debt hanya masuk jika sudah lunas
+        if (tx.type==='debt' && tx.status==='paid') exp+=tx.amount;
       }
     });
     incomeData.push(inc);
@@ -2533,7 +3144,6 @@ function applyTheme() {
   document.documentElement.setAttribute('data-app-theme', theme === 'default' ? '' : theme);
   const t2 = document.getElementById('darkToggle2');
   if (t2) t2.className = 'toggle'+(state.dark?' on':'');
-  // Update active theme card
   document.querySelectorAll('.theme-card').forEach(c => {
     c.classList.toggle('active', c.dataset.themeName === theme);
   });
@@ -2547,21 +3157,101 @@ function setTheme(name) {
 }
 
 // ============================================================
-// EDIT STATUS TRANSAKSI
+// EDIT STATUS & PARTIAL PAYMENT
 // ============================================================
 let editingTxnId = null;
+let editingAmountId = null;
 
 function openEditStatus(id) {
   const tx = state.transactions.find(t => t.id === id);
   if (!tx) return;
+  // Jika sudah lunas, tampilkan edit status biasa
+  if (tx.status === 'paid') {
+    editingTxnId = id;
+    const typeLabel = tx.type === 'debt' ? t('debtType') : t('recvType');
+    document.getElementById('editStatusInfo').innerHTML = `
+      <b>${typeLabel}</b> · ${escHtml(translateCat(tx.category))}<br>
+      ${fmtRp(tx.amount)} · ${tx.date}
+    `;
+    document.getElementById('editStatusSelect').value = tx.status || 'not_paid';
+    openModal('editStatusModal');
+    return;
+  }
+  // Belum lunas — buka partial pay modal
   editingTxnId = id;
-  const typeLabel = tx.type === 'debt' ? t('debtType') : t('recvType');
-  document.getElementById('editStatusInfo').innerHTML = `
-    <b>${typeLabel}</b> · ${escHtml(tx.category)}<br>
-    ${fmtRp(tx.amount)} · ${tx.date}
+  const typeLabel = tx.type === 'debt' ? t('partialPayDebt') : t('partialPayRecv');
+  const ppIcon = tx.type==='debt'
+    ? '<span style="display:inline-flex;align-items:center;margin-right:6px;color:var(--danger)">' + `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>` + '</span>'
+    : '<span style="display:inline-flex;align-items:center;margin-right:6px;color:var(--success)">' + `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>` + '</span>';
+  const ptEl = document.getElementById('partialPayTitle');
+  ptEl.style.display = 'flex'; ptEl.style.alignItems = 'center';
+  ptEl.innerHTML = ppIcon + typeLabel;
+  document.getElementById('partialPayInfo').innerHTML = `
+    <b>${escHtml(translateCat(tx.category))}</b> · ${tx.date}<br>
+    <span style="font-size:1.05rem;font-weight:700;color:var(--navy)">${fmtRp(tx.amount)}</span>
+    ${tx.paidAmount ? `<span style="color:var(--success);margin-left:8px;font-size:0.85rem">✓ ${fmtRp(tx.paidAmount)} ${state.lang==='id'?'sudah dibayar':'already paid'}</span>` : ''}
   `;
-  document.getElementById('editStatusSelect').value = tx.status || 'not_paid';
-  openModal('editStatusModal');
+  document.getElementById('partialPayLabel').textContent = tx.type==='debt' ? t('partialPayLabelDebt') : t('partialPayLabelRecv');
+  document.getElementById('partialPayFullBtn').textContent = t('partialPayFull');
+  document.getElementById('partialAmtLabel').textContent = tx.type==='debt' ? t('partialAmtLabelDebt') : t('partialAmtLabelRecv');
+  document.getElementById('partialPayBtn').textContent = t('partialPayPartial');
+  document.getElementById('partialOrText').textContent = t('partialOr');
+  document.getElementById('partialPayAmount').value = '';
+  openModal('partialPayModal');
+  setTimeout(() => feather.replace(), 50);
+}
+
+function confirmPartialPay(mode) {
+  const tx = state.transactions.find(t => t.id === editingTxnId);
+  if (!tx) return;
+
+  if (mode === 'full') {
+    const oldStatus = tx.status;
+    tx.status = 'paid';
+    tx.paidAmount = tx.amount;
+    saveState();
+    closeModal('partialPayModal');
+    updateAll();
+    if (tx.type === 'debt') {
+      showToast(`${t('debtCleared')} ${fmtRp(tx.amount)}`, '✓');
+    } else {
+      showToast(`${t('recvCleared')} ${fmtRp(tx.amount)}`, '✓');
+    }
+  } else {
+    const inp = document.getElementById('partialPayAmount');
+    const amt = getAmountValue(inp);
+    if (!amt || amt <= 0 || amt > tx.amount) {
+      showToast(t('partialAmountError'), '!');
+      inp.style.borderColor = 'var(--danger)';
+      setTimeout(() => inp.style.borderColor = '', 2000);
+      return;
+    }
+
+    // Catat transaksi pembayaran sebagian
+    const partialTxn = {
+      id: Date.now(),
+      type: tx.type === 'debt' ? 'expense' : 'income',
+      amount: amt,
+      category: tx.category,
+      note: (tx.type==='debt' ? 'Cicilan utang: ' : 'Cicilan piutang: ') + (tx.note || tx.category),
+      date: new Date().toISOString().split('T')[0],
+      recurring: 'none',
+      status: 'paid',
+      createdAt: new Date().toISOString()
+    };
+    state.transactions.unshift(partialTxn);
+
+    // Update sisa hutang/piutang
+    tx.paidAmount = (tx.paidAmount || 0) + amt;
+    if (tx.paidAmount >= tx.amount) {
+      tx.status = 'paid';
+    }
+
+    saveState();
+    closeModal('partialPayModal');
+    updateAll();
+    showToast(t('partialSaved'), '✓');
+  }
 }
 
 function saveEditStatus() {
@@ -2573,18 +3263,55 @@ function saveEditStatus() {
   closeModal('editStatusModal');
   updateAll();
 
-  // Toast informatif
   if (oldStatus !== tx.status && tx.status === 'paid') {
     if (tx.type === 'debt') {
-      showToast(`✅ ${t('debtCleared')} ${fmtRp(tx.amount)}`);
+      showToast(`${t('debtCleared')} ${fmtRp(tx.amount)}`, '✓');
     } else if (tx.type === 'receivable') {
-      showToast(`✅ ${t('recvCleared')} ${fmtRp(tx.amount)}`);
+      showToast(`${t('recvCleared')} ${fmtRp(tx.amount)}`, '✓');
     } else {
-      showToast(t('statusUpdated'));
+      showToast(t('statusUpdated'), '✓');
     }
   } else {
-    showToast(t('statusUpdated'));
+    showToast(t('statusUpdated'), '✓');
   }
+}
+
+// ============================================================
+// EDIT AMOUNT (Recent Activities)
+// ============================================================
+function openEditAmount(id) {
+  const tx = state.transactions.find(t => t.id === id);
+  if (!tx) return;
+  editingAmountId = id;
+  document.getElementById('editAmountTitle').textContent = t('editAmount');
+  document.getElementById('editAmountLbl').textContent = t('editAmountLbl');
+  document.getElementById('editAmountSaveBtn').textContent = t('editAmountSaveBtnTxt');
+  document.getElementById('editAmountInfo').innerHTML = `
+    <b>${escHtml(translateCat(tx.category))}</b> · ${tx.date}<br>
+    <span style="color:var(--gray-400);font-size:0.82rem">${tx.note || '—'}</span><br>
+    <span style="font-size:1rem;font-weight:700;color:var(--navy);margin-top:4px;display:inline-block">${fmtRp(tx.amount)}</span>
+  `;
+  document.getElementById('editAmountInput').value = tx.amount.toLocaleString('id-ID');
+  openModal('editAmountModal');
+  setTimeout(() => feather.replace(), 50);
+}
+
+function saveEditAmount() {
+  const tx = state.transactions.find(t => t.id === editingAmountId);
+  if (!tx) return;
+  const inp = document.getElementById('editAmountInput');
+  const newAmt = getAmountValue(inp);
+  if (!newAmt || newAmt <= 0) {
+    showToast(t('fieldAmountMsg'), '⚠️');
+    inp.style.borderColor = 'var(--danger)';
+    setTimeout(() => inp.style.borderColor = '', 2000);
+    return;
+  }
+  tx.amount = newAmt;
+  saveState();
+  closeModal('editAmountModal');
+  updateAll();
+  showToast(t('editAmountSaved'), '✓');
 }
 
 function toggleDark() {
@@ -2750,20 +3477,136 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 
+  // Mobile bottom nav
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navMap = {pageHome:'navHome',pageTxn:'navTxn',pageAnalytics:'navAnalytics',pageSavings:'navSavings',pageSettings:'navSettings'};
   if (navMap[id]) document.getElementById(navMap[id]).classList.add('active');
 
-  if (id==='pageAnalytics') {
-    setTimeout(() => { renderCharts(); feather.replace(); }, 100);
-  }
+  // Desktop sidebar
+  document.querySelectorAll('.desk-nav-item').forEach(n => n.classList.remove('active'));
+  const deskEl = document.getElementById('deskNav_' + id);
+  if (deskEl) deskEl.classList.add('active');
+
+  if (id==='pageAnalytics') setTimeout(() => { renderCharts(); feather.replace(); }, 100);
   if (id==='pageSavings') renderSavings();
   feather.replace();
 }
 
 // ============================================================
-// CLEAR DATA
+// DESKTOP VIEW TOGGLE
 // ============================================================
+function applyDesktopMode() {
+  const on = state.desktopView === true;
+  document.body.setAttribute('data-desktop', on ? 'true' : 'false');
+
+  const sidebar  = document.getElementById('deskSidebar');
+  const bottomNav = document.getElementById('bottomNav');
+  const toggle   = document.getElementById('desktopToggle');
+  const app      = document.getElementById('app');
+
+  if (!sidebar) return;
+
+  if (on) {
+    sidebar.style.display = 'flex';
+    if (bottomNav) bottomNav.style.display = 'none';
+    app.style.display = 'grid';
+    app.style.paddingBottom = '0';
+    if (toggle) toggle.className = 'toggle on';
+    // Update user info in sidebar
+    const userEl = document.getElementById('deskNavUser');
+    if (userEl) userEl.textContent = (state.avatar||'') + ' ' + (state.user||'');
+  } else {
+    sidebar.style.display = 'none';
+    if (bottomNav) bottomNav.style.display = 'flex';
+    app.style.display = 'block';
+    app.style.paddingBottom = '80px';
+    if (toggle) toggle.className = 'toggle';
+  }
+  feather.replace();
+}
+
+function toggleDesktopView() {
+  state.desktopView = !state.desktopView;
+  saveState();
+  applyDesktopMode();
+}
+
+// ============================================================
+// JSON IMPORT / EXPORT (Data Transfer)
+// ============================================================
+function triggerImportJSON() {
+  document.getElementById('importJSONInput').value = '';
+  document.getElementById('importJSONInput').click();
+}
+
+function handleImportJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      // Validate it's a Growth+ backup
+      if (!data.transactions && !data.savings) {
+        showToast(t('importError'), '!');
+        return;
+      }
+      openImportModal(data);
+    } catch(err) {
+      showToast(t('importError'), '!');
+    }
+  };
+  reader.readAsText(file);
+}
+
+let _importPendingData = null;
+
+function openImportModal(data) {
+  _importPendingData = data;
+  const txnCount = (data.transactions||[]).length;
+  const archCount = (data.archivedTransactions||[]).length;
+  const svCount  = (data.savings||[]).length;
+  const info = state.lang === 'id'
+    ? `Ditemukan: ${txnCount} transaksi, ${archCount} arsip, ${svCount} tabungan`
+    : `Found: ${txnCount} transactions, ${archCount} archived, ${svCount} savings`;
+  document.getElementById('importModalInfo').textContent = info;
+  document.getElementById('importModalTitle').textContent = t('importModeTitle');
+  document.getElementById('importMergeLbl').textContent = t('importMerge');
+  document.getElementById('importReplaceLbl').textContent = t('importReplace');
+  document.getElementById('importConfirmBtn').textContent = t('importData');
+  document.querySelector('input[name="importMode"][value="merge"]').checked = true;
+  openModal('importModal');
+}
+
+function confirmImport() {
+  if (!_importPendingData) return;
+  const mode = document.querySelector('input[name="importMode"]:checked').value;
+  const src  = _importPendingData;
+
+  if (mode === 'replace') {
+    state.transactions          = src.transactions          || [];
+    state.archivedTransactions  = src.archivedTransactions  || [];
+    state.savings               = src.savings               || [];
+    if (src.budget) state.budget = src.budget;
+  } else {
+    // Merge — deduplicate by id
+    const existIds = new Set(state.transactions.map(t => t.id));
+    (src.transactions||[]).forEach(t => { if (!existIds.has(t.id)) state.transactions.push(t); });
+
+    const existArch = new Set((state.archivedTransactions||[]).map(t => t.id));
+    (src.archivedTransactions||[]).forEach(t => { if (!existArch.has(t.id)) state.archivedTransactions.push(t); });
+
+    const existSv = new Set(state.savings.map(s => s.id));
+    (src.savings||[]).forEach(s => { if (!existSv.has(s.id)) state.savings.push(s); });
+  }
+
+  saveState();
+  closeModal('importModal');
+  updateAll();
+  showToast(t('importSuccess'), '✓');
+  _importPendingData = null;
+}
+
 function clearAllData() {
   if (!confirm(state.lang==='en' ? 'Delete ALL data? This cannot be undone!' : 'Hapus SEMUA data? Ini tidak bisa dibatalkan!')) return;
   localStorage.clear();
@@ -2777,11 +3620,18 @@ function escHtml(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function showToast(msg) {
+function showToast(msg, icon) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
+  const iconEl = document.getElementById('toastIcon');
+  const msgEl = document.getElementById('toastMsg');
+  if (!el) return;
+  icon = icon || (msg.includes('❌')||msg.includes('⚠️') ? '⚠️' : msg.includes('🗑')||msg.includes('Dihapus')||msg.includes('Deleted') ? '🗑' : '✓');
+  if (iconEl) iconEl.textContent = icon;
+  if (msgEl) msgEl.textContent = msg.replace(/^[✅❌⚠️🗑✓💸🎉👍]\s*/,'');
+  else el.textContent = msg;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2500);
+  clearTimeout(el._toastTimer);
+  el._toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
 // Budget warning CoCo
@@ -2793,6 +3643,254 @@ setInterval(() => {
   if (pct >= 0.9) cocoEl.textContent = t('budgetDanger');
   else if (pct >= 0.7) cocoEl.textContent = t('budgetWarn');
 }, 60000);
+
+// Budget warning CoCo
+setInterval(() => {
+  if (!state.budget) return;
+  const {monthExpense} = getStats();
+  const pct = monthExpense / state.budget;
+  const cocoEl = document.getElementById('cocoMsg');
+  if (pct >= 0.9) cocoEl.textContent = t('budgetDanger');
+  else if (pct >= 0.7) cocoEl.textContent = t('budgetWarn');
+}, 60000);
+
+// ============================================================
+// UPDATE DYNAMIC SECTION TITLES (i18n)
+// ============================================================
+function updateNewFeatureTitles() {
+  const mkTitle = (svgStr, text) => `<span style="display:inline-flex;align-items:center;gap:6px">${svgStr} ${text}</span>`;
+  const el = (id) => document.getElementById(id);
+  const calSvg   = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+  const heartSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const bulbSvg  = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>`;
+  if (el('dailySumTitle'))  { el('dailySumTitle').style.display='flex'; el('dailySumTitle').style.alignItems='center'; el('dailySumTitle').style.gap='6px'; el('dailySumTitle').innerHTML  = calSvg   + ' ' + t('dailySumTitle'); }
+  if (el('fhTitle'))        { el('fhTitle').style.display='flex';       el('fhTitle').style.alignItems='center';       el('fhTitle').style.gap='6px';       el('fhTitle').innerHTML        = heartSvg + ' ' + t('fhTitle'); }
+  if (el('smartBudTitle'))  { el('smartBudTitle').style.display='flex'; el('smartBudTitle').style.alignItems='center'; el('smartBudTitle').style.gap='6px'; el('smartBudTitle').innerHTML  = bulbSvg  + ' ' + t('smartBudTitle'); }
+}
+
+// ============================================================
+// 1. DAILY SPENDING SUMMARY
+// ============================================================
+function renderDailySummary() {
+  const el = document.getElementById('dailySummaryCard');
+  if (!el) return;
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  const allTxns = [...state.transactions, ...(state.archivedTransactions || [])];
+
+  const todayTxns   = allTxns.filter(tx => tx.date === today);
+  const yesterdayTxns = allTxns.filter(tx => tx.date === yesterday);
+
+  const todaySpent     = todayTxns.filter(tx => tx.type === 'expense' || (tx.type === 'debt' && tx.status === 'paid')).reduce((s,tx) => s+tx.amount, 0);
+  const todayIncome    = todayTxns.filter(tx => tx.type === 'income').reduce((s,tx) => s+tx.amount, 0);
+  const yesterdaySpent = yesterdayTxns.filter(tx => tx.type === 'expense' || (tx.type === 'debt' && tx.status === 'paid')).reduce((s,tx) => s+tx.amount, 0);
+
+  if (!todayTxns.length) {
+    el.innerHTML = `<div style="text-align:center;padding:12px 0;color:var(--gray-400);font-size:0.88rem">${t('dailyNoTxn')}</div>`;
+    return;
+  }
+
+  // Comparison vs yesterday
+  let compareHtml = '';
+  if (yesterdaySpent > 0 && todaySpent > 0) {
+    const diff = todaySpent - yesterdaySpent;
+    const pct  = Math.round(Math.abs(diff / yesterdaySpent) * 100);
+    if (diff > 0) {
+      compareHtml = `<span style="color:var(--danger);font-weight:700">▲ ${pct}% ${t('dailyMoreThan')}</span>`;
+    } else if (diff < 0) {
+      compareHtml = `<span style="color:var(--success);font-weight:700">▼ ${pct}% ${t('dailyLessThan')}</span>`;
+    } else {
+      compareHtml = `<span style="color:var(--teal);font-weight:700">${t('dailySameAs')}</span>`;
+    }
+  }
+
+  // Today's category breakdown
+  const cats = {};
+  todayTxns.filter(tx => tx.type === 'expense').forEach(tx => { cats[translateCat(tx.category)] = (cats[translateCat(tx.category)] || 0) + tx.amount; });
+  const topCats = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  const catBars = topCats.map(([cat, amt]) => {
+    const pct = todaySpent > 0 ? Math.round((amt/todaySpent)*100) : 0;
+    return `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px">
+        <span style="color:var(--gray-600);font-weight:600">${escHtml(cat)}</span>
+        <span style="color:var(--navy);font-weight:700">${fmtRp(amt)} <span style="color:var(--gray-400);font-weight:400">(${pct}%)</span></span>
+      </div>
+      <div style="height:6px;background:var(--gray-100);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:var(--grad-card);border-radius:99px;transition:width 0.8s ease"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div>
+        <div style="font-size:0.78rem;color:var(--gray-400);margin-bottom:2px">${t('dailySpent')}</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--danger)">${fmtRp(todaySpent)}</div>
+        ${compareHtml ? `<div style="font-size:0.78rem;margin-top:4px">${compareHtml}</div>` : ''}
+      </div>
+      ${todayIncome > 0 ? `<div style="text-align:right">
+        <div style="font-size:0.72rem;color:var(--gray-400);margin-bottom:2px">In</div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--success)">+${fmtRp(todayIncome)}</div>
+      </div>` : ''}
+    </div>
+    ${yesterdaySpent > 0 ? `<div style="font-size:0.75rem;color:var(--gray-400);margin-bottom:10px">${t('dailyYesterday')}: ${fmtRp(yesterdaySpent)}</div>` : ''}
+    ${catBars}`;
+}
+
+// ============================================================
+// 2. FINANCIAL HEALTH SCORE
+// ============================================================
+function renderFinancialHealth() {
+  const el = document.getElementById('financialHealthCard');
+  if (!el) return;
+
+  const { monthIncome, monthExpense, debtUnpaid } = getStats();
+  const allTxns = [...state.transactions, ...(state.archivedTransactions || [])];
+
+  if (monthIncome === 0 && allTxns.length === 0) {
+    el.innerHTML = `<div style="text-align:center;padding:12px 0;color:var(--gray-400);font-size:0.88rem">${t('fhNoData')}</div>`;
+    return;
+  }
+
+  // 1. Budget Discipline (0–40 pts): how close to budget without exceeding
+  let budgetScore = 40;
+  if (state.budget > 0) {
+    const pct = monthExpense / state.budget;
+    if (pct <= 0.7)       budgetScore = 40;
+    else if (pct <= 0.85) budgetScore = 32;
+    else if (pct <= 1.0)  budgetScore = 20;
+    else                  budgetScore = Math.max(0, 20 - Math.round((pct-1)*40));
+  } else {
+    budgetScore = 20; // no budget set
+  }
+
+  // 2. Saving Ratio (0–35 pts)
+  let savingScore = 0;
+  if (monthIncome > 0) {
+    const ratio = Math.max(0, (monthIncome - monthExpense) / monthIncome);
+    if (ratio >= 0.30)      savingScore = 35;
+    else if (ratio >= 0.20) savingScore = 28;
+    else if (ratio >= 0.10) savingScore = 18;
+    else if (ratio >= 0)    savingScore = Math.round(ratio / 0.10 * 18);
+    else                    savingScore = 0;
+  }
+
+  // 3. Spending Habit (0–25 pts): pengeluaran konsisten & tidak ada spike extrem
+  let habitScore = 25;
+  const expTxns = state.transactions.filter(tx => tx.type === 'expense');
+  if (expTxns.length >= 3) {
+    const amts = expTxns.map(tx => tx.amount);
+    const avg  = amts.reduce((a,b)=>a+b,0) / amts.length;
+    const spikes = amts.filter(a => a > avg * 3).length;
+    habitScore = Math.max(0, 25 - spikes * 5);
+  } else if (expTxns.length === 0) {
+    habitScore = 15;
+  }
+  // Unpaid debt penalty
+  if (debtUnpaid > monthIncome * 0.5) habitScore = Math.max(0, habitScore - 10);
+
+  const total = Math.min(100, budgetScore + savingScore + habitScore);
+
+  let statusLabel, statusColor, statusBg, statusIconSvg = '';
+  if (total >= 80)      { statusLabel = t('fhExcellent'); statusColor = '#065f46'; statusBg = '#d1fae5'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>` ; }
+  else if (total >= 60) { statusLabel = t('fhGood');      statusColor = '#1d4ed8'; statusBg = '#dbeafe'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>` ; }
+  else if (total >= 40) { statusLabel = t('fhFair');      statusColor = '#92400e'; statusBg = '#fef3c7'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>` ; }
+  else                  { statusLabel = t('fhPoor');      statusColor = '#991b1b'; statusBg = '#fee2e2'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>` ; }
+
+  const scoreBar = (score, max, color) => `
+    <div style="height:8px;background:var(--gray-100);border-radius:99px;overflow:hidden;flex:1">
+      <div style="height:100%;width:${Math.round(score/max*100)}%;background:${color};border-radius:99px;transition:width 0.9s ease"></div>
+    </div>`;
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+      <div style="position:relative;width:80px;height:80px;flex-shrink:0">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="var(--gray-100)" stroke-width="9"/>
+          <circle cx="40" cy="40" r="32" fill="none" stroke="${statusColor === '#065f46' ? '#10b981' : statusColor === '#1d4ed8' ? '#3b82f6' : statusColor === '#92400e' ? '#f59e0b' : '#ef4444'}"
+            stroke-width="9" stroke-linecap="round" stroke-dasharray="201"
+            stroke-dashoffset="${Math.round(201 - (total/100)*201)}"
+            transform="rotate(-90 40 40)"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:1.25rem;font-weight:800;color:var(--navy);line-height:1">${total}</span>
+          <span style="font-size:0.5rem;color:var(--gray-400)">/100</span>
+        </div>
+      </div>
+      <div style="flex:1">
+        <div style="display:inline-flex;align-items:center;gap:5px;background:${statusBg};color:${statusColor};border-radius:99px;padding:4px 14px;font-size:0.8rem;font-weight:700;margin-bottom:8px">${statusIconSvg}${statusLabel}</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.72rem;color:var(--gray-400)">
+            <span style="width:88px;flex-shrink:0">${t('fhBudgetDiscipline')}</span>
+            ${scoreBar(budgetScore, 40, '#3b82f6')}
+            <span style="font-size:0.72rem;font-weight:700;color:var(--navy);width:24px;text-align:right">${budgetScore}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.72rem;color:var(--gray-400)">
+            <span style="width:88px;flex-shrink:0">${t('fhSavingRatio')}</span>
+            ${scoreBar(savingScore, 35, '#10b981')}
+            <span style="font-size:0.72rem;font-weight:700;color:var(--navy);width:24px;text-align:right">${savingScore}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.72rem;color:var(--gray-400)">
+            <span style="width:88px;flex-shrink:0">${t('fhSpendingHabit')}</span>
+            ${scoreBar(habitScore, 25, '#f59e0b')}
+            <span style="font-size:0.72rem;font-weight:700;color:var(--navy);width:24px;text-align:right">${habitScore}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// 3. SMART BUDGET RECOMMENDATION
+// ============================================================
+function renderSmartBudget() {
+  const el = document.getElementById('smartBudgetCard');
+  if (!el) return;
+
+  const { monthIncome } = getStats();
+  if (monthIncome <= 0) {
+    el.innerHTML = `<div style="text-align:center;padding:12px 0;color:var(--gray-400);font-size:0.88rem">${t('smartBudNoIncome')}</div>`;
+    return;
+  }
+
+  const needs   = Math.round(monthIncome * 0.50);
+  const wants   = Math.round(monthIncome * 0.30);
+  const savings = Math.round(monthIncome * 0.20);
+
+  const { monthExpense } = getStats();
+  const actualNeeds   = monthExpense; // simplify: all expense = needs
+  const needsPct  = monthIncome > 0 ? Math.round(actualNeeds/monthIncome*100) : 0;
+
+  const row = (icon, label, recommended, actual, pct, color) => `
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:1.1rem">${icon}</span>
+          <span style="font-size:0.82rem;font-weight:700;color:var(--navy)">${label}</span>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:0.88rem;font-weight:800;color:var(--navy)">${fmtRp(recommended)}</div>
+          ${actual !== null ? `<div style="font-size:0.7rem;color:${actual > recommended ? 'var(--danger)':'var(--success)'}">
+            ${state.lang==='id'?'Aktual':'Actual'}: ${fmtRp(actual)}
+          </div>` : ''}
+        </div>
+      </div>
+      <div style="height:8px;background:var(--gray-100);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:99px;transition:width 0.8s ease"></div>
+      </div>
+    </div>`;
+
+  el.innerHTML = `
+    ${row(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`, t('smartBudNeeds'),   needs,   actualNeeds, Math.min(100, needsPct), '#3b82f6')}
+    ${row(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`, t('smartBudWants'),   wants,   null,        30, '#f59e0b')}
+    ${row(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1a2 2 0 0 0 2 2h1"/><path d="M16 11h0"/></svg>`, t('smartBudSavings'), savings, null,        20, '#10b981')}
+    <div style="margin-top:4px;padding-top:10px;border-top:1px solid var(--gray-100);font-size:0.76rem;color:var(--gray-400);text-align:center">
+      ${state.lang==='id'?'Berdasarkan pemasukan bulan ini':'Based on this month\'s income'}: <span style="font-weight:700;color:var(--navy)">${fmtRp(monthIncome)}</span>
+    </div>`;
+}
 
 // Initial CoCo message
 setTimeout(() => showCocoMsg(), 2500);
