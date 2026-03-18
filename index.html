@@ -1261,6 +1261,20 @@ body[data-desktop="true"] #bottomNav { display:none !important; }
       </select>
       <input class="inp" type="text" id="svCustomLocation" placeholder="Ketik nama tempat menabung..." data-i18n-placeholder="svCustomPlaceholder" style="margin:8px 0 0;display:none"/>
     </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="svSource">Sumber Dana Awal</label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <label id="svSrcBalanceLbl" style="flex:1;display:flex;align-items:center;gap:8px;background:var(--gray-100);border:2px solid var(--gray-200);border-radius:var(--radius-xs);padding:10px 12px;cursor:pointer;transition:var(--transition);font-size:0.82rem;font-weight:600;color:var(--gray-400)">
+          <input type="radio" name="svSourceNew" id="svSourceBalance" value="balance" onchange="updateSvSourceUI()" style="accent-color:#3b82f6;flex-shrink:0">
+          <span data-i18n="svFromBalance">Dari Saldo (dipotong)</span>
+        </label>
+        <label id="svSrcOtherLbl" style="flex:1;display:flex;align-items:center;gap:8px;background:var(--grad-soft);border:2px solid var(--teal);border-radius:var(--radius-xs);padding:10px 12px;cursor:pointer;transition:var(--transition);font-size:0.82rem;font-weight:600;color:var(--teal)">
+          <input type="radio" name="svSourceNew" id="svSourceOther" value="other" checked onchange="updateSvSourceUI()" style="accent-color:var(--teal);flex-shrink:0">
+          <span data-i18n="svFromOther">Sumber Lain</span>
+        </label>
+      </div>
+      <div id="svSourceNoteNew" style="display:none;font-size:0.72rem;color:#1d4ed8;margin-top:6px;padding:6px 10px;background:#dbeafe;border-radius:var(--radius-xs)" data-i18n="svSourceNote">Saldo akan berkurang sesuai jumlah yang ditabung.</div>
+    </div>
     <button class="btn-primary" onclick="addSavingsGoal()" data-i18n="save">Simpan Tujuan</button>
   </div>
 </div>
@@ -2528,6 +2542,30 @@ function toggleCustomLocation(sel) {
   customInp.style.display = (sel.value === 'lainnya' || sel.value === 'other') ? 'block' : 'none';
 }
 
+function updateSvSourceUI() {
+  const isBalance = document.getElementById('svSourceBalance').checked;
+  const balanceLbl = document.getElementById('svSrcBalanceLbl');
+  const otherLbl = document.getElementById('svSrcOtherLbl');
+  const noteEl = document.getElementById('svSourceNoteNew');
+  if (isBalance) {
+    balanceLbl.style.background = '#dbeafe';
+    balanceLbl.style.borderColor = '#3b82f6';
+    balanceLbl.style.color = '#1d4ed8';
+    otherLbl.style.background = 'var(--gray-100)';
+    otherLbl.style.borderColor = 'var(--gray-200)';
+    otherLbl.style.color = 'var(--gray-400)';
+    noteEl.style.display = 'block';
+  } else {
+    otherLbl.style.background = 'var(--grad-soft)';
+    otherLbl.style.borderColor = 'var(--teal)';
+    otherLbl.style.color = 'var(--teal)';
+    balanceLbl.style.background = 'var(--gray-100)';
+    balanceLbl.style.borderColor = 'var(--gray-200)';
+    balanceLbl.style.color = 'var(--gray-400)';
+    noteEl.style.display = 'none';
+  }
+}
+
 function addSavingsGoal() {
   const name = document.getElementById('svName').value.trim();
   const target = parseFloat(document.getElementById('svTarget').value);
@@ -2536,11 +2574,25 @@ function addSavingsGoal() {
   const locSel = document.getElementById('svLocation').value;
   const locCustom = document.getElementById('svCustomLocation').value.trim();
   const loc = (locSel === 'lainnya' || locSel === 'other') ? (locCustom || t('other').replace('...','')) : locSel;
+  const fromBalance = document.getElementById('svSourceBalance').checked;
   if (!name || !target) { showToast(t('fillRequired')); return; }
-  state.savings.push({id:Date.now(), name, target, current, bank, location:loc});
+
+  // Cek saldo cukup jika sumber dari saldo
+  if (fromBalance && current > 0) {
+    const { balance } = getStats();
+    if (current > balance) {
+      showToast(state.lang==='id'
+        ? `Saldo tidak cukup! Saldo: ${fmtRp(balance)}`
+        : `Insufficient balance! Balance: ${fmtRp(balance)}`, '!');
+      return;
+    }
+  }
+
+  state.savings.push({id:Date.now(), name, target, current, bank, location:loc, fromBalance});
   saveState();
   closeModal('savingModal');
   renderSavings();
+  updateBalanceDisplay();
   showToast(t('savedOK'));
   // Reset
   document.getElementById('svName').value = '';
@@ -2550,6 +2602,9 @@ function addSavingsGoal() {
   document.getElementById('svLocation').value = 'BCA';
   document.getElementById('svCustomLocation').style.display = 'none';
   document.getElementById('svCustomLocation').value = '';
+  // Reset source to 'other' (default)
+  document.getElementById('svSourceOther').checked = true;
+  updateSvSourceUI();
 }
 
 function renderSavings() {
