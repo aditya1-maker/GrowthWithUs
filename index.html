@@ -372,6 +372,7 @@ input,select,textarea{color:var(--navy)!important;background:var(--white)!import
 /* TOAST */
 .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-8px);background:var(--grad-card);color:#fff;padding:12px 22px 12px 16px;border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.35s,transform 0.35s;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:10px;min-width:200px;max-width:90vw}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+body[data-desktop="true"] .toast{left:calc(50% + 110px)}
 .toast-icon{width:26px;height:26px;background:rgba(255,255,255,0.25);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.85rem}
 .toast-msg{flex:1}
 
@@ -524,6 +525,12 @@ body[data-desktop="true"] #bottomNav { display:none !important; }
 [data-app-theme="autumn"][data-theme="dark"]{--white:#1a0e00;--beige:#0f0800;--gray-100:#2a1800;--gray-200:#3d2500;--gray-400:#F5A53C;--gray-600:#FFD166;--navy:#fffbf0;--teal:#E8820C}
 [data-app-theme="winter"][data-theme="dark"]{--white:#042f2e;--beige:#021a19;--gray-100:#042f2e;--gray-200:#0f3d3c;--gray-400:#2dd4bf;--gray-600:#99f6e4;--navy:#f0fdfa;--teal:#0891b2}
 
+/* PIN KEY */
+.pin-key{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.3);color:#fff;font-family:var(--font);font-size:1.5rem;font-weight:700;cursor:pointer;transition:var(--transition);display:flex;align-items:center;justify-content:center}
+.pin-key:hover{background:rgba(255,255,255,0.32)}
+.pin-key:active{transform:scale(0.92)}
+.pin-del{font-size:1.2rem}
+
 /* DIVIDER */
 .divider{height:1px;background:var(--gray-200);margin:16px 0}
 
@@ -633,7 +640,110 @@ body[data-desktop="true"] #bottomNav { display:none !important; }
 })();
 </script>
 
-<!-- ONBOARDING -->
+<!-- PIN LOCK SCREEN -->
+<div id="pinLockScreen" style="display:none;position:fixed;inset:0;background:var(--grad-main);z-index:9996;flex-direction:column;align-items:center;justify-content:center;padding:32px">
+  <div style="text-align:center;margin-bottom:32px">
+    <div style="font-size:2rem;font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:4px">Growth<span style="color:rgba(255,255,255,0.7)">+</span></div>
+    <div style="color:rgba(255,255,255,0.7);font-size:0.9rem" id="pinLockSubtitle">Masukkan PIN kamu</div>
+  </div>
+  <div style="display:flex;gap:14px;margin-bottom:28px" id="pinDots">
+    <div style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.6);background:transparent" id="pd0"></div>
+    <div style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.6);background:transparent" id="pd1"></div>
+    <div style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.6);background:transparent" id="pd2"></div>
+    <div style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.6);background:transparent" id="pd3"></div>
+  </div>
+  <div id="pinError" style="color:#fca5a5;font-size:0.82rem;font-weight:600;margin-bottom:16px;min-height:20px;text-align:center"></div>
+  <div style="display:grid;grid-template-columns:repeat(3,72px);gap:12px" id="pinPad">
+    <button class="pin-key" onclick="pinInput('1')">1</button>
+    <button class="pin-key" onclick="pinInput('2')">2</button>
+    <button class="pin-key" onclick="pinInput('3')">3</button>
+    <button class="pin-key" onclick="pinInput('4')">4</button>
+    <button class="pin-key" onclick="pinInput('5')">5</button>
+    <button class="pin-key" onclick="pinInput('6')">6</button>
+    <button class="pin-key" onclick="pinInput('7')">7</button>
+    <button class="pin-key" onclick="pinInput('8')">8</button>
+    <button class="pin-key" onclick="pinInput('9')">9</button>
+    <div></div>
+    <button class="pin-key" onclick="pinInput('0')">0</button>
+    <button class="pin-key pin-del" onclick="pinDelete()">⌫</button>
+  </div>
+  <button id="pinForgotBtn" onclick="showPinForgot()" style="margin-top:28px;background:none;border:none;color:rgba(255,255,255,0.65);font-family:var(--font);font-size:0.82rem;cursor:pointer;text-decoration:underline">Lupa PIN?</button>
+</div>
+
+<!-- PIN FORGOT SCREEN -->
+<div id="pinForgotScreen" style="display:none;position:fixed;inset:0;background:var(--grad-main);z-index:9996;flex-direction:column;align-items:center;justify-content:center;padding:32px">
+  <div style="background:rgba(255,255,255,0.15);backdrop-filter:blur(12px);border-radius:var(--radius);padding:28px 24px;width:100%;max-width:360px">
+    <div style="font-size:1.1rem;font-weight:800;color:#fff;margin-bottom:6px;text-align:center">Verifikasi Identitas</div>
+    <div style="font-size:0.82rem;color:rgba(255,255,255,0.7);text-align:center;margin-bottom:20px" id="pinForgotQuestion"></div>
+    <input class="inp" type="text" id="pinForgotAnswer" placeholder="Jawaban kamu..." style="margin-bottom:12px"/>
+    <button onclick="verifyForgotPin()" class="btn-primary" style="margin-bottom:10px">Verifikasi</button>
+    <button onclick="hidePinForgot()" style="width:100%;padding:10px;background:none;border:1.5px solid rgba(255,255,255,0.35);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.85rem;color:#fff;cursor:pointer">Batal</button>
+    <div id="pinForgotError" style="color:#fca5a5;font-size:0.8rem;text-align:center;margin-top:8px;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- PIN SETUP MODAL -->
+<div class="modal-overlay" id="pinSetupModal">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('pinSetupModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
+    <div class="modal-title" style="display:flex;align-items:center;gap:8px">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Atur PIN
+    </div>
+    <div id="pinSetupStep1">
+      <div style="font-size:0.85rem;color:var(--gray-600);margin-bottom:16px">Buat PIN 4 angka untuk mengunci aplikasi.</div>
+      <div class="form-group">
+        <label class="form-label">PIN Baru (4 angka)</label>
+        <input class="inp" type="password" inputmode="numeric" maxlength="4" id="pinNewInp" placeholder="····" style="margin:0;letter-spacing:8px;font-size:1.4rem;text-align:center"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Konfirmasi PIN</label>
+        <input class="inp" type="password" inputmode="numeric" maxlength="4" id="pinConfirmInp" placeholder="····" style="margin:0;letter-spacing:8px;font-size:1.4rem;text-align:center"/>
+      </div>
+      <div style="font-size:0.85rem;font-weight:600;color:var(--navy);margin-bottom:8px;margin-top:4px">Pertanyaan Keamanan</div>
+      <div style="font-size:0.78rem;color:var(--gray-400);margin-bottom:10px">Digunakan jika kamu lupa PIN.</div>
+      <div class="form-group">
+        <label class="form-label">Pilih Pertanyaan</label>
+        <select class="inp" id="pinSecQuestion" style="margin:0" onchange="togglePinCustomQ(this)">
+          <option value="artis">Siapa artis/musisi favoritmu?</option>
+          <option value="makanan">Apa makanan favoritmu?</option>
+          <option value="kota">Di kota mana kamu lahir?</option>
+          <option value="hewan">Apa hewan peliharaan pertamamu?</option>
+          <option value="film">Apa film favoritmu?</option>
+          <option value="custom">Pertanyaan sendiri...</option>
+        </select>
+      </div>
+      <div class="form-group" id="pinCustomQGroup" style="display:none">
+        <label class="form-label">Tulis Pertanyaanmu</label>
+        <input class="inp" type="text" id="pinCustomQ" placeholder="Pertanyaan keamanan..." style="margin:0"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Jawaban</label>
+        <input class="inp" type="text" id="pinSecAnswer" placeholder="Jawaban (huruf kecil semua)" style="margin:0"/>
+      </div>
+      <button class="btn-primary" onclick="savePinSetup()" style="margin-top:4px">Aktifkan PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN CHANGE MODAL -->
+<div class="modal-overlay" id="pinChangeModal">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('pinChangeModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
+    <div class="modal-title">Ubah / Nonaktifkan PIN</div>
+    <div class="form-group">
+      <label class="form-label">PIN Saat Ini</label>
+      <input class="inp" type="password" inputmode="numeric" maxlength="4" id="pinOldInp" placeholder="····" style="margin:0;letter-spacing:8px;font-size:1.4rem;text-align:center"/>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="verifyOldPin('change')" class="btn-primary" style="flex:1">Lanjut Ubah</button>
+      <button onclick="verifyOldPin('disable')" style="flex:1;padding:14px;background:none;border:2px solid var(--danger);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:var(--danger)">Nonaktifkan</button>
+    </div>
+    <div id="pinChangeError" style="color:var(--danger);font-size:0.8rem;text-align:center;margin-top:8px;min-height:18px"></div>
+  </div>
+</div>
 <div id="onboarding">
   <div class="onb-slides" id="onbSlides">
     <div class="onb-slide">
@@ -755,12 +865,37 @@ body[data-desktop="true"] #bottomNav { display:none !important; }
       <!-- BALANCE CARD -->
       <div class="balance-card">
         <div class="balance-label" data-i18n="totalBalance">Total Balance</div>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
           <div class="balance-amount" id="balanceDisplay" style="margin-bottom:0">Rp 0</div>
           <div class="fab" id="quickAddBtn" title="Add Transaction" style="position:static;transform:none;flex-shrink:0">
             <i data-feather="plus" style="width:20px;height:20px"></i>
           </div>
         </div>
+
+        <!-- SALDO FAKTUAL — collapsed toggle -->
+        <div style="margin-bottom:14px">
+          <div id="actualBalanceToggleRow" style="display:flex;align-items:center;gap:6px;cursor:pointer;opacity:0.7" onclick="toggleActualBalancePanel()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span style="font-size:0.68rem;color:#fff;font-weight:600;letter-spacing:0.04em">Saldo Faktual</span>
+            <span id="actualBalancePillAmt" style="display:none;font-size:0.68rem;font-weight:700;color:rgba(255,255,255,0.9)"></span>
+            <span id="actualBalancePillDiff" style="display:none;font-size:0.65rem;font-weight:700;padding:1px 7px;border-radius:99px;background:rgba(255,255,255,0.15)"></span>
+          </div>
+          <div id="actualBalancePanel" style="display:none;margin-top:7px;background:rgba(255,255,255,0.10);border-radius:var(--radius-xs);padding:8px 10px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <input type="text" id="actualBalanceInput"
+                placeholder="Nominal rekening..."
+                inputmode="numeric"
+                oninput="formatAmountInput(this);liveUpdateActualBalance()"
+                style="flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:6px 10px;font-family:var(--font);font-size:0.8rem;font-weight:600;color:#fff;outline:none"
+                onfocus="this.style.borderColor='rgba(255,255,255,0.55)'"
+                onblur="this.style.borderColor='rgba(255,255,255,0.2)'"/>
+              <button onclick="saveActualBalance()" style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:6px 10px;font-family:var(--font);font-size:0.72rem;font-weight:700;color:#fff;cursor:pointer;white-space:nowrap">Simpan</button>
+              <button id="clearActualBalanceBtn" onclick="clearActualBalance()" title="Hapus" style="display:none;background:rgba(255,80,80,0.25);border:1px solid rgba(255,150,150,0.3);border-radius:6px;padding:6px 8px;font-family:var(--font);font-size:0.72rem;color:#fff;cursor:pointer">✕</button>
+            </div>
+            <div id="actualBalanceDiff" style="display:none;font-size:0.72rem;font-weight:700;margin-top:5px;padding:3px 8px;border-radius:99px;display:inline-block"></div>
+          </div>
+        </div>
+
         <div class="balance-row">
           <div class="balance-stat">
             <div class="bs-label" data-i18n="income">Income</div>
@@ -931,7 +1066,7 @@ body[data-desktop="true"] #bottomNav { display:none !important; }
       </div>
       <!-- EXPORT ROW -->
       <div class="export-row">
-        <button class="export-btn excel-btn" onclick="exportExcel()"><i data-feather="file-text" style="width:14px;height:14px"></i> Excel</button>
+        <button class="export-btn excel-btn" onclick="openModal('exportPeriodModal')"><i data-feather="file-text" style="width:14px;height:14px"></i> Excel</button>
         <button class="export-btn" onclick="exportCSV()"><i data-feather="download" style="width:14px;height:14px"></i> CSV</button>
         <button class="export-btn" onclick="exportJSON()"><i data-feather="code" style="width:14px;height:14px"></i> JSON</button>
       </div>
@@ -1002,6 +1137,24 @@ body[data-desktop="true"] #bottomNav { display:none !important; }
 
       <!-- SETTINGS LIST -->
       <div class="settings-section">
+        <div class="settings-item">
+          <div class="si-left"><div class="si-icon"><i data-feather="lock" style="width:16px;height:16px;color:var(--teal)"></i></div>
+            <div>
+              <div style="font-size:0.9rem;font-weight:500;color:var(--navy)">PIN Keamanan</div>
+              <div style="font-size:0.74rem;color:var(--gray-400);margin-top:1px" id="pinStatusLabel">Belum aktif</div>
+            </div>
+          </div>
+          <div class="sec-link" id="pinSettingsBtn" onclick="openPinSettings()">Atur</div>
+        </div>
+        <div class="settings-item">
+          <div class="si-left"><div class="si-icon"><i data-feather="credit-card" style="width:16px;height:16px;color:var(--teal)"></i></div>
+            <div>
+              <div style="font-size:0.9rem;font-weight:500;color:var(--navy)">Saldo Faktual</div>
+              <div style="font-size:0.74rem;color:var(--gray-400);margin-top:1px">Bandingkan saldo app vs rekening nyata</div>
+            </div>
+          </div>
+          <div class="sec-link" onclick="openActualBalanceModal()">Atur</div>
+        </div>
         <div class="settings-item">
           <div class="si-left"><div class="si-icon"><i data-feather="moon" style="width:16px;height:16px;color:var(--teal)"></i></div><span data-i18n="darkMode">Mode Gelap</span></div>
           <div class="toggle" id="darkToggle2" onclick="toggleDark()"></div>
@@ -1240,11 +1393,11 @@ body[data-desktop="true"] #bottomNav { display:none !important; }
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" data-i18n="targetAmount">Target (Rp)</label>
-        <input class="inp" type="number" id="svTarget" placeholder="10000000" style="margin:0"/>
+        <input class="inp" type="text" id="svTarget" placeholder="10.000.000" style="margin:0" oninput="formatAmountInput(this)" inputmode="numeric"/>
       </div>
       <div class="form-group">
         <label class="form-label" data-i18n="currentProgress">Saat Ini (Rp)</label>
-        <input class="inp" type="number" id="svCurrent" placeholder="0" style="margin:0"/>
+        <input class="inp" type="text" id="svCurrent" placeholder="0" style="margin:0" oninput="formatAmountInput(this)" inputmode="numeric"/>
       </div>
     </div>
     <div class="form-group">
@@ -1363,6 +1516,59 @@ body[data-desktop="true"] #bottomNav { display:none !important; }
       </label>
     </div>
     <button class="btn-primary" id="importConfirmBtn" onclick="confirmImport()">Import Data</button>
+  </div>
+</div>
+
+<!-- CALENDAR DAY SUMMARY MODAL -->
+<div class="modal-overlay" id="calDayModal">
+  <div class="modal" style="position:relative;max-height:80vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('calDayModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
+    <div class="modal-title" id="calDayTitle" style="font-size:1rem"></div>
+    <div id="calDayContent"></div>
+  </div>
+</div>
+
+<!-- ACTUAL BALANCE MODAL -->
+<div class="modal-overlay" id="actualBalanceModal">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('actualBalanceModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
+    <div class="modal-title" style="display:flex;align-items:center;gap:8px">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      Saldo Faktual
+    </div>
+    <div style="background:var(--gray-100);border-radius:var(--radius-sm);padding:12px 14px;font-size:0.83rem;color:var(--gray-600);margin-bottom:16px;line-height:1.6" id="actualBalanceInfo"></div>
+    <div class="form-group">
+      <label class="form-label" id="actualBalanceLbl">Saldo Faktual (Rp)</label>
+      <input class="inp" type="text" id="actualBalanceInput" placeholder="0" style="margin:0" oninput="formatAmountInput(this)" inputmode="numeric"/>
+    </div>
+    <button class="btn-primary" onclick="saveActualBalance()">Simpan</button>
+    <button id="clearActualBalanceBtn" onclick="clearActualBalance()" style="width:100%;margin-top:8px;padding:12px;background:none;border:2px solid var(--danger);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;color:var(--danger);display:none">Hapus Saldo Faktual</button>
+  </div>
+</div>
+
+<!-- EXPORT PERIOD MODAL -->
+<div class="modal-overlay" id="exportPeriodModal">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('exportPeriodModal')"><i data-feather="x" style="width:14px;height:14px"></i></button>
+    <div class="modal-title" style="display:flex;align-items:center;gap:8px">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d6f42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Download Excel
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+      <button onclick="exportExcelPeriod('weekly')" class="export-period-btn" style="width:100%;padding:14px;background:var(--grad-soft);border:2px solid var(--teal);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.92rem;font-weight:600;cursor:pointer;color:var(--teal);display:flex;align-items:center;justify-content:center;gap:8px">
+        Mingguan (7 hari terakhir)
+      </button>
+      <button onclick="exportExcelPeriod('monthly')" class="export-period-btn" style="width:100%;padding:14px;background:var(--grad-soft);border:2px solid var(--teal);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.92rem;font-weight:600;cursor:pointer;color:var(--teal);display:flex;align-items:center;justify-content:center;gap:8px">
+        Bulanan (bulan ini)
+      </button>
+      <button onclick="exportExcelPeriod('yearly')" class="export-period-btn" style="width:100%;padding:14px;background:var(--grad-soft);border:2px solid var(--teal);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.92rem;font-weight:600;cursor:pointer;color:var(--teal);display:flex;align-items:center;justify-content:center;gap:8px">
+        Tahunan (tahun ini)
+      </button>
+    </div>
+    <button onclick="closeModal('exportPeriodModal');exportExcel()" style="width:100%;padding:12px;background:none;border:2px solid var(--gray-200);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;color:var(--gray-600)">Export Semua Data</button>
   </div>
 </div>
 
@@ -1688,6 +1894,10 @@ let state = {
   lastResetMonth: new Date().getMonth(),
   lastResetYear: new Date().getFullYear(),
   desktopView: false,
+  actualBalance: null,
+  pin: null,
+  pinQuestion: null,
+  pinAnswer: null,
   charts: {}
 };
 
@@ -1763,6 +1973,8 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
           showLogin();
         }
+      } else if (state.pin) {
+        showPinLock();
       } else {
         showApp();
       }
@@ -1843,6 +2055,7 @@ function showApp() {
 function updateAll() {
   updateGreeting();
   updateBalanceDisplay();
+  updateActualBalanceDisplay();
   updateBudget();
   updateSavingsRate();
   renderRecentTxn();
@@ -1857,6 +2070,7 @@ function updateAll() {
   renderFinancialHealth();
   renderSmartBudget();
   updateProfileUI();
+  updatePinStatusLabel();
   applyTheme();
   applyLang();
   updateNewFeatureTitles();
@@ -2106,9 +2320,11 @@ function updateSavingsRate() {
   document.getElementById('srBar').style.width = rate + '%';
 
   let lbl;
-  if (rate >= 20) lbl = t('excellent');
-  else if (rate >= 10) lbl = t('good');
-  else lbl = t('needsImprovement');
+  if (rate >= 81) lbl = t('excellent');
+  else if (rate >= 61) lbl = t('good');
+  else if (rate >= 41) lbl = state.lang === 'id' ? 'Cukup' : 'Fair';
+  else if (rate >= 21) lbl = state.lang === 'id' ? 'Rendah' : 'Low';
+  else lbl = state.lang === 'id' ? 'Sangat Rendah' : 'Very Low';
   document.getElementById('srLbl').textContent = lbl;
 }
 
@@ -2483,48 +2699,106 @@ function renderFullTxn(query='') {
   }
 
   const filter = state.currentFilter || 'all';
-
-  if (filter === 'all') {
-    // Group by type with section headers
-    const groups = [
-      { type: 'income', tKey: 'txnIncome', dot: 'dot-income' },
-      { type: 'expense', tKey: 'txnExpense', dot: 'dot-expense' },
-      { type: 'debt', tKey: 'txnDebt', dot: 'dot-debt' },
-      { type: 'receivable', tKey: 'txnReceivable', dot: 'dot-receivable' }
-    ];
-
-    let html = '';
-    let hasAny = false;
-
-    groups.forEach(g => {
-      const groupTxns = txns.filter(tx => tx.type === g.type);
-      if (groupTxns.length === 0) return;
-      hasAny = true;
-      const total = groupTxns.reduce((a, tx) => a + tx.amount, 0);
-      const labelText = t(g.tKey);
-      html += `<div class="txn-section-label"><span class="type-dot ${g.dot}" style="display:inline-block;margin-right:6px;vertical-align:middle"></span>${labelText} <span>${fmtRp(total)}</span></div>`;
-      html += groupTxns.map(renderTxnItem).join('');
-    });
-
-    if (!hasAny) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--gray-200)"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="empty-text">${t('noTxn')}</div></div>`;
-    } else {
-      el.innerHTML = html;
-      feather.replace();
-    }
-  } else {
-    const filtered = txns.filter(tx => tx.type === filter);
-    if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--gray-200)"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="empty-text">${t('noTxn')}</div></div>`;
-    } else {
-      const total = filtered.reduce((a, tx) => a + tx.amount, 0);
-      const dotMap = { income:'dot-income', expense:'dot-expense', debt:'dot-debt', receivable:'dot-receivable' };
-      const tKeyMap = { income:'txnIncome', expense:'txnExpense', debt:'txnDebt', receivable:'txnReceivable' };
-      const lbl = t(tKeyMap[filter] || filter);
-      el.innerHTML = `<div class="txn-section-label"><span class="type-dot ${dotMap[filter]||''}" style="display:inline-block;margin-right:6px;vertical-align:middle"></span>${lbl} <span>${fmtRp(total)}</span></div>` + filtered.map(renderTxnItem).join('');
-      feather.replace();
-    }
+  if (filter !== 'all') {
+    txns = txns.filter(tx => tx.type === filter);
   }
+
+  if (!txns.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--gray-200)"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="empty-text">${t('noTxn')}</div></div>`;
+    return;
+  }
+
+  const typeColorMap = { income:'var(--success)', expense:'var(--danger)', debt:'var(--warning)', receivable:'var(--teal)' };
+  const chevronSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+
+  // Group by category
+  const groups = {};
+  txns.forEach(tx => {
+    const key = tx.category || 'Lainnya';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(tx);
+  });
+
+  // Sort groups by total amount descending
+  const sortedGroups = Object.entries(groups).sort((a, b) => {
+    const sumA = a[1].reduce((s, tx) => s + tx.amount, 0);
+    const sumB = b[1].reduce((s, tx) => s + tx.amount, 0);
+    return sumB - sumA;
+  });
+
+  let html = '';
+  sortedGroups.forEach(([cat, catTxns], groupIdx) => {
+    const totalAmt = catTxns.reduce((s, tx) => s + tx.amount, 0);
+    const typeCounts = {};
+    catTxns.forEach(tx => { typeCounts[tx.type] = (typeCounts[tx.type]||0) + 1; });
+    const dominantType = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1])[0][0];
+    const dotClassMap = { income:'dot-income', expense:'dot-expense', debt:'dot-debt', receivable:'dot-receivable' };
+    const typeLabelMap = { income: t('txnIncome'), expense: t('txnExpense'), debt: t('txnDebt'), receivable: t('txnReceivable') };
+    const amtColor = (dominantType==='income'||dominantType==='receivable') ? 'var(--success)' : 'var(--danger)';
+    const groupId = `ftg_${groupIdx}`;
+
+    html += `
+    <div style="margin-bottom:10px;border-radius:var(--radius-sm);overflow:hidden;box-shadow:var(--shadow-sm);border:1px solid var(--gray-100)">
+      <div onclick="toggleFullTxnGroup('${groupId}')"
+           style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--white);cursor:pointer;user-select:none;transition:background 0.2s"
+           onmouseenter="this.style.background='var(--gray-100)'" onmouseleave="this.style.background='var(--white)'">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0">
+          <span class="type-dot ${dotClassMap[dominantType]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0"></span>
+          <span style="font-size:0.86rem;font-weight:700;color:var(--navy)">${escHtml(translateCat(cat))}</span>
+          <span style="font-size:0.7rem;font-weight:600;color:${typeColorMap[dominantType]};background:var(--gray-100);padding:1px 7px;border-radius:99px">${typeLabelMap[dominantType]||dominantType}</span>
+          <span style="font-size:0.7rem;font-weight:600;color:var(--gray-400);background:var(--gray-100);padding:1px 7px;border-radius:99px">${catTxns.length} ${t('txnCount')}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span style="font-size:0.88rem;font-weight:800;color:${amtColor}">${fmtRp(totalAmt)}</span>
+          <span id="${groupId}_chevron" style="color:var(--gray-400);transition:transform 0.25s;display:flex;align-items:center">${chevronSvg}</span>
+        </div>
+      </div>
+      <div id="${groupId}" style="display:none;flex-direction:column;gap:0;background:var(--beige)">
+        ${catTxns.map((tx, i) => {
+          const {bg,color,icon} = txnTypeColor(tx.type);
+          const ac = (tx.type==='income'||tx.type==='receivable') ? 'var(--success)' : 'var(--danger)';
+          const sign = (tx.type==='income'||tx.type==='receivable') ? '+' : '-';
+          const recHtml = tx.recurring && tx.recurring!=='none'
+            ? `<span class="rec-badge">${tx.recurring==='weekly'?t('weekly'):t('monthly')}</span>` : '';
+          const statusHtml = (tx.type==='debt'||tx.type==='receivable')
+            ? `<span class="status-badge ${tx.status==='paid'?'status-paid':'status-unpaid'}" style="cursor:pointer" onclick="event.stopPropagation();openEditStatus(${tx.id})">${tx.status==='paid'?t('paid'):t('notPaid')}</span>` : '';
+          const borderTop = i > 0 ? 'border-top:1px solid var(--gray-100);' : '';
+          return `<div class="txn-item" style="padding:10px 14px;border-radius:0;box-shadow:none;${borderTop}background:var(--white);margin:0">
+            <div class="txn-icon-wrap" style="background:${bg};width:34px;height:34px;border-radius:10px">
+              <i data-feather="${icon}" style="width:15px;height:15px;color:${color}"></i>
+            </div>
+            <div class="txn-info">
+              <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+                <span style="font-size:0.78rem;font-weight:600;color:var(--gray-600)">${escHtml(tx.note)||'—'}</span>
+                ${recHtml}${statusHtml}
+              </div>
+              <div style="font-size:0.7rem;color:var(--gray-400);margin-top:1px">${tx.date}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:0.88rem;font-weight:700;color:${ac}">${sign}${fmtRp(tx.amount)}</div>
+              <div style="display:flex;gap:4px;margin-top:3px;justify-content:flex-end">
+                <button onclick="event.stopPropagation();openEditAmount(${tx.id})" style="background:none;border:1px solid var(--gray-200);border-radius:6px;padding:1px 7px;font-size:0.68rem;color:var(--teal);cursor:pointer;font-family:var(--font)"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button onclick="event.stopPropagation();deleteTransaction(${tx.id})" style="background:none;border:1px solid var(--gray-200);border-radius:6px;padding:1px 7px;font-size:0.68rem;color:var(--danger);cursor:pointer;font-family:var(--font)">${t('deletedOK').replace('.','')}</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+  feather.replace();
+}
+
+function toggleFullTxnGroup(id) {
+  const panel = document.getElementById(id);
+  const chevron = document.getElementById(id + '_chevron');
+  if (!panel) return;
+  const isOpen = panel.style.display === 'flex';
+  panel.style.display = isOpen ? 'none' : 'flex';
+  panel.style.flexDirection = 'column';
+  if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 
 // ============================================================
@@ -2568,8 +2842,8 @@ function updateSvSourceUI() {
 
 function addSavingsGoal() {
   const name = document.getElementById('svName').value.trim();
-  const target = parseFloat(document.getElementById('svTarget').value);
-  const current = parseFloat(document.getElementById('svCurrent').value) || 0;
+  const target = getAmountValue(document.getElementById('svTarget'));
+  const current = getAmountValue(document.getElementById('svCurrent')) || 0;
   const bank = document.getElementById('svBank').value.trim();
   const locSel = document.getElementById('svLocation').value;
   const locCustom = document.getElementById('svCustomLocation').value.trim();
@@ -3154,7 +3428,7 @@ function renderCalendar() {
       else if (txn.income) cls += ' has-income';
       else if (txn.expense) cls += ' has-expense';
     }
-    html += `<div class="${cls}">${d}</div>`;
+    html += `<div class="${cls}" onclick="showCalDaySummary(${year},${month+1},${d})" style="cursor:pointer">${d}</div>`;
   }
   el.innerHTML = html;
 }
@@ -3850,9 +4124,9 @@ function renderFinancialHealth() {
   const total = Math.min(100, budgetScore + savingScore + habitScore);
 
   let statusLabel, statusColor, statusBg, statusIconSvg = '';
-  if (total >= 80)      { statusLabel = t('fhExcellent'); statusColor = '#065f46'; statusBg = '#d1fae5'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>` ; }
-  else if (total >= 60) { statusLabel = t('fhGood');      statusColor = '#1d4ed8'; statusBg = '#dbeafe'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>` ; }
-  else if (total >= 40) { statusLabel = t('fhFair');      statusColor = '#92400e'; statusBg = '#fef3c7'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>` ; }
+  if (total >= 81)      { statusLabel = t('fhExcellent'); statusColor = '#065f46'; statusBg = '#d1fae5'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>` ; }
+  else if (total >= 61) { statusLabel = t('fhGood');      statusColor = '#1d4ed8'; statusBg = '#dbeafe'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>` ; }
+  else if (total >= 41) { statusLabel = t('fhFair');      statusColor = '#92400e'; statusBg = '#fef3c7'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>` ; }
   else                  { statusLabel = t('fhPoor');      statusColor = '#991b1b'; statusBg = '#fee2e2'; statusIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>` ; }
 
   const scoreBar = (score, max, color) => `
@@ -3945,6 +4219,417 @@ function renderSmartBudget() {
     <div style="margin-top:4px;padding-top:10px;border-top:1px solid var(--gray-100);font-size:0.76rem;color:var(--gray-400);text-align:center">
       ${state.lang==='id'?'Berdasarkan pemasukan bulan ini':'Based on this month\'s income'}: <span style="font-weight:700;color:var(--navy)">${fmtRp(monthIncome)}</span>
     </div>`;
+}
+
+// ============================================================
+// CALENDAR DAY SUMMARY
+// ============================================================
+function showCalDaySummary(year, month, day) {
+  const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  const allTxns = [...state.transactions, ...(state.archivedTransactions || [])];
+  const dayTxns = allTxns.filter(tx => tx.date === dateStr);
+
+  const locale = state.lang === 'en' ? 'en-US' : 'id-ID';
+  const dateLabel = new Date(year, month-1, day).toLocaleDateString(locale, {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  document.getElementById('calDayTitle').textContent = dateLabel;
+
+  if (!dayTxns.length) {
+    document.getElementById('calDayContent').innerHTML = `<div style="text-align:center;padding:20px 0;color:var(--gray-400);font-size:0.88rem">${state.lang==='id'?'Tidak ada transaksi pada tanggal ini.':'No transactions on this date.'}</div>`;
+    openModal('calDayModal');
+    setTimeout(() => feather.replace(), 50);
+    return;
+  }
+
+  let totalIn = 0, totalOut = 0;
+  dayTxns.forEach(tx => {
+    if (tx.type==='income' || (tx.type==='receivable' && tx.status==='paid')) totalIn += tx.amount;
+    if (tx.type==='expense' || (tx.type==='debt' && tx.status==='paid')) totalOut += tx.amount;
+  });
+
+  const typeColorMap = { income:'var(--success)', expense:'var(--danger)', debt:'var(--warning)', receivable:'var(--teal)' };
+  const typeLabelMap = { income: t('txnIncome'), expense: t('txnExpense'), debt: t('txnDebt'), receivable: t('txnReceivable') };
+
+  let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+    <div style="background:#d1fae5;border-radius:var(--radius-sm);padding:12px;text-align:center">
+      <div style="font-size:0.72rem;color:#065f46;margin-bottom:4px">${t('income')}</div>
+      <div style="font-size:1rem;font-weight:800;color:#065f46">+${fmtRp(totalIn)}</div>
+    </div>
+    <div style="background:#fee2e2;border-radius:var(--radius-sm);padding:12px;text-align:center">
+      <div style="font-size:0.72rem;color:#991b1b;margin-bottom:4px">${t('expenses')}</div>
+      <div style="font-size:1rem;font-weight:800;color:#991b1b">-${fmtRp(totalOut)}</div>
+    </div>
+  </div>`;
+
+  html += dayTxns.map(tx => {
+    const {bg, color, icon} = txnTypeColor(tx.type);
+    const ac = (tx.type==='income'||tx.type==='receivable') ? 'var(--success)' : 'var(--danger)';
+    const sign = (tx.type==='income'||tx.type==='receivable') ? '+' : '-';
+    const statusHtml = (tx.type==='debt'||tx.type==='receivable')
+      ? `<span class="status-badge ${tx.status==='paid'?'status-paid':'status-unpaid'}">${tx.status==='paid'?t('paid'):t('notPaid')}</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--white);border-radius:var(--radius-sm);margin-bottom:6px;border:1px solid var(--gray-100)">
+      <div style="width:36px;height:36px;border-radius:10px;background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-feather="${icon}" style="width:15px;height:15px;color:${color}"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.85rem;font-weight:600;color:var(--navy)">${escHtml(translateCat(tx.category))}</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:2px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;color:${typeColorMap[tx.type]};background:var(--gray-100);padding:1px 6px;border-radius:99px">${typeLabelMap[tx.type]}</span>
+          ${statusHtml}
+          ${tx.note ? `<span style="font-size:0.7rem;color:var(--gray-400)">${escHtml(tx.note)}</span>` : ''}
+        </div>
+      </div>
+      <div style="font-size:0.92rem;font-weight:700;color:${ac};flex-shrink:0">${sign}${fmtRp(tx.amount)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('calDayContent').innerHTML = html;
+  openModal('calDayModal');
+  setTimeout(() => feather.replace(), 50);
+}
+
+// ============================================================
+// EXCEL EXPORT BY PERIOD
+// ============================================================
+function exportExcelPeriod(period) {
+  if (typeof XLSX === 'undefined') { showToast('Library Excel tidak tersedia'); return; }
+
+  const now = new Date();
+  let startDate, label;
+
+  if (period === 'weekly') {
+    startDate = new Date(now - 7*24*60*60*1000);
+    label = 'mingguan';
+  } else if (period === 'monthly') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    label = 'bulanan_' + String(now.getMonth()+1).padStart(2,'0') + '_' + now.getFullYear();
+  } else {
+    startDate = new Date(now.getFullYear(), 0, 1);
+    label = 'tahunan_' + now.getFullYear();
+  }
+
+  const allTxns = [...state.transactions, ...(state.archivedTransactions || [])];
+  const filtered = allTxns.filter(tx => new Date(tx.date) >= startDate);
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet: Semua Transaksi
+  const allRows = [['ID','Tipe','Jumlah','Kategori','Catatan','Tanggal','Status','Rutin']];
+  filtered.forEach(tx => {
+    allRows.push([tx.id, tx.type, tx.amount, tx.category, tx.note||'', tx.date, tx.status||'', tx.recurring||'']);
+  });
+  const wsAll = XLSX.utils.aoa_to_sheet(allRows);
+  wsAll['!cols'] = [{wch:15},{wch:12},{wch:15},{wch:15},{wch:25},{wch:12},{wch:12},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, wsAll, 'Semua Transaksi');
+
+  // Sheet per tipe
+  const types = [
+    { key:'income', name:'Pemasukan' },
+    { key:'expense', name:'Pengeluaran' },
+    { key:'debt', name:'Utang' },
+    { key:'receivable', name:'Piutang' }
+  ];
+  types.forEach(({key, name}) => {
+    const rows = [['Jumlah','Kategori','Catatan','Tanggal','Status','Rutin']];
+    filtered.filter(tx=>tx.type===key).forEach(tx => {
+      rows.push([tx.amount, tx.category, tx.note||'', tx.date, tx.status||'', tx.recurring||'none']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
+  });
+
+  // Ringkasan
+  let inc=0, exp=0, debt=0, recv=0;
+  filtered.forEach(tx => {
+    if(tx.type==='income') inc+=tx.amount;
+    if(tx.type==='expense') exp+=tx.amount;
+    if(tx.type==='debt') debt+=tx.amount;
+    if(tx.type==='receivable') recv+=tx.amount;
+  });
+  const rate = inc > 0 ? Math.round(((inc-exp)/inc)*100) : 0;
+  const sumRows = [
+    ['Ringkasan Keuangan — ' + label.replace(/_/g,' ')],
+    [''],
+    ['Total Pemasukan', inc],
+    ['Total Pengeluaran', exp],
+    ['Total Utang', debt],
+    ['Total Piutang', recv],
+    ['Tingkat Hemat', rate+'%'],
+    [''],
+    ['Periode mulai', startDate.toLocaleDateString('id-ID')],
+    ['Sampai', now.toLocaleDateString('id-ID')],
+    ['Diekspor pada', new Date().toLocaleString('id-ID')]
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumRows), 'Ringkasan');
+
+  XLSX.writeFile(wb, `growthplus_${label}_${now.toISOString().split('T')[0]}.xlsx`);
+  closeModal('exportPeriodModal');
+  showToast('Excel berhasil diunduh!', '✓');
+}
+
+// ============================================================
+// ACTUAL BALANCE (SALDO FAKTUAL) — collapsible inline
+// ============================================================
+function toggleActualBalancePanel() {
+  const panel = document.getElementById('actualBalancePanel');
+  const toggleRow = document.getElementById('actualBalanceToggleRow');
+  const isOpen = panel.style.display === 'block';
+  panel.style.display = isOpen ? 'none' : 'block';
+  // swap + to - icon
+  const icon = toggleRow.querySelector('svg');
+  if (icon) {
+    icon.innerHTML = isOpen
+      ? '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'
+      : '<line x1="5" y1="12" x2="19" y2="12"/>';
+  }
+}
+
+function openActualBalanceModal() {
+  // compat: open panel if closed
+  const panel = document.getElementById('actualBalancePanel');
+  if (panel && panel.style.display !== 'block') toggleActualBalancePanel();
+  const inp = document.getElementById('actualBalanceInput');
+  if (inp) setTimeout(() => { inp.focus(); inp.select(); }, 100);
+}
+
+function liveUpdateActualBalance() {
+  const inp = document.getElementById('actualBalanceInput');
+  const diffEl = document.getElementById('actualBalanceDiff');
+  const pillEl = document.getElementById('actualBalancePillDiff');
+  const amtEl = document.getElementById('actualBalancePillAmt');
+  const val = getAmountValue(inp);
+  if (!val) {
+    if(diffEl) diffEl.style.display='none';
+    if(pillEl) pillEl.style.display='none';
+    if(amtEl) amtEl.style.display='none';
+    return;
+  }
+  const { balance } = getStats();
+  const diff = val - balance;
+  const diffTxt = (diff >= 0 ? '▲ +' : '▼ ') + fmtRp(Math.abs(diff));
+  const col = diff >= 0 ? '#a8f0d4' : '#fca5a5';
+  if (diffEl) { diffEl.style.display='inline-block'; diffEl.textContent=diffTxt; diffEl.style.color=col; diffEl.style.background='rgba(255,255,255,0.1)'; diffEl.style.padding='2px 8px'; diffEl.style.borderRadius='99px'; }
+  if (pillEl) { pillEl.style.display='inline'; pillEl.textContent=diffTxt; pillEl.style.color=col; }
+  if (amtEl) { amtEl.style.display='inline'; amtEl.textContent='· ' + fmtRp(val); }
+}
+
+function saveActualBalance() {
+  const inp = document.getElementById('actualBalanceInput');
+  const val = getAmountValue(inp);
+  if (!val || val <= 0) { showToast(state.lang==='id'?'Masukkan nominal saldo faktual':'Enter actual balance amount','!'); return; }
+  state.actualBalance = val;
+  saveState();
+  updateActualBalanceDisplay();
+  showToast(state.lang==='id'?'Saldo faktual disimpan!':'Actual balance saved!','✓');
+}
+
+function clearActualBalance() {
+  state.actualBalance = null;
+  saveState();
+  const inp = document.getElementById('actualBalanceInput');
+  if (inp) inp.value = '';
+  updateActualBalanceDisplay();
+  showToast(state.lang==='id'?'Saldo faktual dihapus.':'Actual balance cleared.');
+}
+
+function updateActualBalanceDisplay() {
+  const inp = document.getElementById('actualBalanceInput');
+  const diffEl = document.getElementById('actualBalanceDiff');
+  const pillEl = document.getElementById('actualBalancePillDiff');
+  const amtEl = document.getElementById('actualBalancePillAmt');
+  const clearBtn = document.getElementById('clearActualBalanceBtn');
+  if (!inp) return;
+
+  if (state.actualBalance !== null && state.actualBalance !== undefined) {
+    inp.value = state.actualBalance.toLocaleString('id-ID');
+    const { balance } = getStats();
+    const diff = state.actualBalance - balance;
+    const diffTxt = (diff >= 0 ? '▲ +' : '▼ ') + fmtRp(Math.abs(diff));
+    const col = diff >= 0 ? '#a8f0d4' : '#fca5a5';
+    if (diffEl) { diffEl.style.display='inline-block'; diffEl.textContent=diffTxt; diffEl.style.color=col; diffEl.style.background='rgba(255,255,255,0.1)'; diffEl.style.padding='2px 8px'; diffEl.style.borderRadius='99px'; }
+    if (pillEl) { pillEl.style.display='inline'; pillEl.textContent=diffTxt; pillEl.style.color=col; }
+    if (amtEl) { amtEl.style.display='inline'; amtEl.textContent='· ' + fmtRp(state.actualBalance); }
+    if (clearBtn) clearBtn.style.display='inline-block';
+  } else {
+    if (diffEl) diffEl.style.display='none';
+    if (pillEl) pillEl.style.display='none';
+    if (amtEl) amtEl.style.display='none';
+    if (clearBtn) clearBtn.style.display='none';
+  }
+}
+
+// ============================================================
+// PIN SECURITY
+// ============================================================
+let _pinBuffer = '';
+let _pinAction = null; // 'change' | 'disable'
+
+function showPinLock() {
+  const el = document.getElementById('pinLockScreen');
+  el.style.display = 'flex';
+  _pinBuffer = '';
+  updatePinDots();
+  document.getElementById('pinError').textContent = '';
+  document.getElementById('pinForgotBtn').style.display = state.pinQuestion ? 'block' : 'none';
+  document.getElementById('pinLockSubtitle').textContent = state.lang==='id' ? 'Masukkan PIN kamu' : 'Enter your PIN';
+}
+
+function pinInput(digit) {
+  if (_pinBuffer.length >= 4) return;
+  _pinBuffer += digit;
+  updatePinDots();
+  if (_pinBuffer.length === 4) {
+    setTimeout(() => checkPin(), 120);
+  }
+}
+
+function pinDelete() {
+  _pinBuffer = _pinBuffer.slice(0, -1);
+  updatePinDots();
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('pd' + i);
+    if (d) {
+      d.style.background = i < _pinBuffer.length ? '#fff' : 'transparent';
+      d.style.borderColor = i < _pinBuffer.length ? '#fff' : 'rgba(255,255,255,0.6)';
+    }
+  }
+}
+
+function checkPin() {
+  if (_pinBuffer === state.pin) {
+    document.getElementById('pinLockScreen').style.display = 'none';
+    _pinBuffer = '';
+    updatePinDots();
+    showApp();
+  } else {
+    document.getElementById('pinError').textContent = state.lang==='id' ? 'PIN salah, coba lagi.' : 'Wrong PIN, try again.';
+    // shake animation
+    const dots = document.getElementById('pinDots');
+    dots.style.transform = 'translateX(-8px)';
+    setTimeout(() => { dots.style.transform = 'translateX(8px)'; }, 80);
+    setTimeout(() => { dots.style.transform = 'translateX(-5px)'; }, 160);
+    setTimeout(() => { dots.style.transform = 'translateX(0)'; }, 240);
+    _pinBuffer = '';
+    setTimeout(() => updatePinDots(), 260);
+  }
+}
+
+function showPinForgot() {
+  if (!state.pinQuestion) return;
+  document.getElementById('pinLockScreen').style.display = 'none';
+  const forgotEl = document.getElementById('pinForgotScreen');
+  forgotEl.style.display = 'flex';
+  document.getElementById('pinForgotQuestion').textContent = state.pinQuestion;
+  document.getElementById('pinForgotAnswer').value = '';
+  document.getElementById('pinForgotError').textContent = '';
+}
+
+function hidePinForgot() {
+  document.getElementById('pinForgotScreen').style.display = 'none';
+  showPinLock();
+}
+
+function verifyForgotPin() {
+  const ans = (document.getElementById('pinForgotAnswer').value || '').trim().toLowerCase();
+  if (ans === (state.pinAnswer || '').toLowerCase()) {
+    // correct — disable pin, go to app
+    state.pin = null;
+    state.pinQuestion = null;
+    state.pinAnswer = null;
+    saveState();
+    document.getElementById('pinForgotScreen').style.display = 'none';
+    showToast(state.lang==='id'?'Verifikasi berhasil. PIN dinonaktifkan.':'Verified. PIN disabled.');
+    showApp();
+    updatePinStatusLabel();
+  } else {
+    document.getElementById('pinForgotError').textContent = state.lang==='id' ? 'Jawaban salah.' : 'Wrong answer.';
+    const inp = document.getElementById('pinForgotAnswer');
+    inp.style.borderColor = 'var(--danger)';
+    setTimeout(() => inp.style.borderColor = '', 1800);
+  }
+}
+
+function openPinSettings() {
+  if (state.pin) {
+    // already has pin — open change/disable modal
+    document.getElementById('pinOldInp').value = '';
+    document.getElementById('pinChangeError').textContent = '';
+    openModal('pinChangeModal');
+  } else {
+    openModal('pinSetupModal');
+  }
+  setTimeout(() => feather.replace(), 50);
+}
+
+function togglePinCustomQ(sel) {
+  document.getElementById('pinCustomQGroup').style.display = sel.value === 'custom' ? 'block' : 'none';
+}
+
+const PIN_QUESTIONS = {
+  artis: 'Siapa artis/musisi favoritmu?',
+  makanan: 'Apa makanan favoritmu?',
+  kota: 'Di kota mana kamu lahir?',
+  hewan: 'Apa hewan peliharaan pertamamu?',
+  film: 'Apa film favoritmu?',
+  custom: null
+};
+
+function savePinSetup() {
+  const newPin = document.getElementById('pinNewInp').value;
+  const confirmPin = document.getElementById('pinConfirmInp').value;
+  const qSel = document.getElementById('pinSecQuestion').value;
+  const qCustom = document.getElementById('pinCustomQ').value.trim();
+  const answer = (document.getElementById('pinSecAnswer').value || '').trim().toLowerCase();
+
+  if (!/^\d{4}$/.test(newPin)) { showToast(state.lang==='id'?'PIN harus 4 angka.':'PIN must be 4 digits.','!'); return; }
+  if (newPin !== confirmPin) { showToast(state.lang==='id'?'Konfirmasi PIN tidak cocok.':'PIN confirmation mismatch.','!'); return; }
+  if (!answer) { showToast(state.lang==='id'?'Isi jawaban keamanan.':'Fill in security answer.','!'); return; }
+
+  const question = qSel === 'custom' ? (qCustom || 'Pertanyaan keamanan?') : PIN_QUESTIONS[qSel];
+  if (!question) { showToast(state.lang==='id'?'Tulis pertanyaan keamananmu.':'Write your security question.','!'); return; }
+
+  state.pin = newPin;
+  state.pinQuestion = question;
+  state.pinAnswer = answer;
+  saveState();
+  closeModal('pinSetupModal');
+  updatePinStatusLabel();
+  showToast(state.lang==='id'?'PIN berhasil diaktifkan! 🔒':'PIN activated! 🔒','✓');
+}
+
+function verifyOldPin(action) {
+  const old = document.getElementById('pinOldInp').value;
+  if (old !== state.pin) {
+    document.getElementById('pinChangeError').textContent = state.lang==='id' ? 'PIN salah.' : 'Wrong PIN.';
+    return;
+  }
+  document.getElementById('pinChangeError').textContent = '';
+  closeModal('pinChangeModal');
+
+  if (action === 'disable') {
+    state.pin = null; state.pinQuestion = null; state.pinAnswer = null;
+    saveState();
+    updatePinStatusLabel();
+    showToast(state.lang==='id'?'PIN dinonaktifkan.':'PIN disabled.');
+  } else {
+    // open setup modal to set new pin
+    document.getElementById('pinNewInp').value = '';
+    document.getElementById('pinConfirmInp').value = '';
+    document.getElementById('pinSecAnswer').value = '';
+    document.getElementById('pinSecQuestion').value = 'artis';
+    document.getElementById('pinCustomQGroup').style.display = 'none';
+    openModal('pinSetupModal');
+    setTimeout(() => feather.replace(), 50);
+  }
+}
+
+function updatePinStatusLabel() {
+  const lbl = document.getElementById('pinStatusLabel');
+  const btn = document.getElementById('pinSettingsBtn');
+  if (!lbl) return;
+  lbl.textContent = state.pin ? (state.lang==='id'?'Aktif 🔒':'Active 🔒') : (state.lang==='id'?'Belum aktif':'Not set');
+  if (btn) btn.textContent = state.pin ? (state.lang==='id'?'Ubah':'Change') : (state.lang==='id'?'Atur':'Set');
 }
 
 // Initial CoCo message
